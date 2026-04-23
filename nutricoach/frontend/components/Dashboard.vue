@@ -4,7 +4,7 @@
       <div class="brand">NutriCoach AI</div>
       <nav>
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
-        <router-link to="/setup" class="nav-link">Profile</router-link>
+        <router-link to="/profile" class="nav-link">My Profile</router-link>
         <router-link to="/meal-plan" class="nav-link">Meal Plan</router-link>
         <router-link to="/tracker" class="nav-link">Food Tracker</router-link>
         <a href="#" class="nav-link" @click.prevent="logout">Logout</a>

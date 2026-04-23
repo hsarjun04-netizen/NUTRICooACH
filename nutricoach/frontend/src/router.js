@@ -6,12 +6,14 @@ import ProfileSetup from '../components/ProfileSetup.vue'
 import Dashboard from '../components/Dashboard.vue'
 import MealPlan from '../components/MealPlan.vue'
 import FoodTracker from '../components/FoodTracker.vue'
+import Profile from '../components/Profile.vue'
 
 const routes = [
   { path: '/', component: LandingPage },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
   { path: '/setup', component: ProfileSetup, meta: { requiresAuth: true } },
+  { path: '/profile', component: Profile, meta: { requiresAuth: true } },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/meal-plan', component: MealPlan, meta: { requiresAuth: true } },
   { path: '/tracker', component: FoodTracker, meta: { requiresAuth: true } }
