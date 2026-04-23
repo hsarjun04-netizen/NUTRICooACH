@@ -478,14 +478,6 @@ def dashboard_summary():
     cur.execute('SELECT weight FROM weight_logs WHERE user_id = ? ORDER BY date ASC LIMIT 1', (user_id,))
     start_weight = cur.fetchone()
 
-    conn.close()
-
-    target = health['target_calories'] if health else 2000
-    goal_progress = 0
-    if start_weight and latest_weight and start_weight['weight']:
-        diff = abs(latest_weight['weight'] - start_weight['weight'])
-        goal_progress = min(round((diff / start_weight['weight']) * 100, 1), 100)
-
     # Water intake
     cur.execute('SELECT amount_ml FROM water_logs WHERE user_id = ? AND date = ?', (user_id, today))
     water_entries = cur.fetchall()
