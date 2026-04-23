@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,10 +10,13 @@ import datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from meal_engine import generate_meal_plan
 
-app = Flask(__name__)
-app.config['JWT_SECRET_KEY'] = 'nutricoach-dev-secret-key-change-in-production'
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'nutricoach-dev-secret-key-change-in-production')
 jwt = JWTManager(app)
-CORS(app)
+
+# Enable CORS only in development
+if os.environ.get('FLASK_ENV') != 'production':
+    CORS(app)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database.db')
 
@@ -673,6 +676,16 @@ def create_user_legacy():
     user_id = cur.lastrowid
     conn.close()
     return jsonify({'id': user_id}), 201
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_vue(path):
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, 'index.html')
 
 
 if __name__ == '__main__':
