@@ -5,13 +5,28 @@
 - [main.js](file://nutricoach/frontend/src/main.js)
 - [App.vue](file://nutricoach/frontend/src/App.vue)
 - [router.js](file://nutricoach/frontend/src/router.js)
-- [LandingPage.vue](file://nutricoach/frontend/components/LandingPage.vue)
-- [Dashboard.vue](file://nutricoach/frontend/components/Dashboard.vue)
+- [auth.js](file://nutricoach/frontend/src/stores/auth.js)
+- [user.js](file://nutricoach/frontend/src/stores/user.js)
+- [api.js](file://nutricoach/frontend/src/api.js)
+- [Login.vue](file://nutricoach/frontend/components/Login.vue)
+- [Register.vue](file://nutricoach/frontend/components/Register.vue)
+- [ProfileSetup.vue](file://nutricoach/frontend/components/ProfileSetup.vue)
+- [MealPlan.vue](file://nutricoach/frontend/components/MealPlan.vue)
+- [FoodTracker.vue](file://nutricoach/frontend/components/FoodTracker.vue)
 - [index.html](file://nutricoach/frontend/index.html)
 - [package.json](file://nutricoach/frontend/package.json)
 - [vite.config.js](file://nutricoach/frontend/vite.config.js)
-- [API.md](file://nutricoach/backend/API.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated main.js to reflect Pinia state management integration
+- Enhanced App.vue with navigation bar and computed properties
+- Expanded router.js with comprehensive authentication guard system
+- Added Pinia store architecture with auth and user management
+- Integrated centralized API service with interceptors
+- Added new components: Login, Register, ProfileSetup, MealPlan, FoodTracker
+- Updated dependency structure to support Vue 3 ecosystem
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -19,88 +34,127 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+6. [State Management with Pinia](#state-management-with-pinia)
+7. [Enhanced Routing System](#enhanced-routing-system)
+8. [Component Lifecycle Management](#component-lifecycle-management)
+9. [Dependency Analysis](#dependency-analysis)
+10. [Performance Considerations](#performance-considerations)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes the Vue.js application architecture for NutriCoach AI, focusing on the application bootstrap process, routing configuration, component structure, and integration with the backend API. The frontend is built with Vue 3 and Vue Router, configured via Vite, and communicates with a Python Flask backend through a local proxy.
+This document describes the Vue.js application architecture for NutriCoach AI, focusing on the major Vue 3 migration with Pinia state management, enhanced routing structure, and comprehensive component ecosystem. The application now features a robust authentication system, centralized state management, and modular component architecture designed for scalability and maintainability.
 
 ## Project Structure
-The frontend follows a conventional Vue 3 project layout with a minimal routing setup and two primary components: a landing page and a dashboard. The application is bootstrapped through a single entry point that mounts the Vue instance and registers the router.
+The frontend has evolved into a comprehensive Vue 3 application with Pinia state management, featuring five distinct authentication and feature components alongside centralized services for API communication and state persistence.
 
 ```mermaid
 graph TB
-subgraph "Frontend Root"
+subgraph "Frontend Architecture"
 HTML["index.html"]
-MAIN["src/main.js"]
-APP["src/App.vue"]
-ROUTER["src/router.js"]
-LP["components/LandingPage.vue"]
-DASH["components/Dashboard.vue"]
+MAIN["src/main.js<br/>Vue 3 + Pinia + Router"]
+APP["src/App.vue<br/>Navigation + Layout"]
+ROUTER["src/router.js<br/>Enhanced Routes + Guards"]
+AUTHSTORE["src/stores/auth.js<br/>Authentication State"]
+USERSTORE["src/stores/user.js<br/>User Profile State"]
+API["src/api.js<br/>Centralized API Service"]
 end
-subgraph "Build Tooling"
-PKG["package.json"]
-VCFG["vite.config.js"]
+subgraph "Authentication Components"
+LOGIN["components/Login.vue"]
+REGISTER["components/Register.vue"]
+PROFILE["components/ProfileSetup.vue"]
 end
-subgraph "Backend API"
-API["Backend API Endpoints"]
+subgraph "Feature Components"
+DASHBOARD["components/Dashboard.vue"]
+MEALPLAN["components/MealPlan.vue"]
+TRACKER["components/FoodTracker.vue"]
+end
+subgraph "Build & Dependencies"
+PKG["package.json<br/>Vue 3 + Pinia + Router"]
+VCFG["vite.config.js<br/>Development Server + Proxy"]
 end
 HTML --> MAIN
 MAIN --> APP
 MAIN --> ROUTER
+MAIN --> AUTHSTORE
+MAIN --> USERSTORE
 APP --> ROUTER
-ROUTER --> LP
-ROUTER --> DASH
-LP --> API
-DASH --> API
+ROUTER --> LOGIN
+ROUTER --> REGISTER
+ROUTER --> PROFILE
+ROUTER --> DASHBOARD
+ROUTER --> MEALPLAN
+ROUTER --> TRACKER
+AUTHSTORE --> API
+USERSTORE --> API
+LOGIN --> AUTHSTORE
+REGISTER --> AUTHSTORE
+PROFILE --> USERSTORE
+MEALPLAN --> API
+TRACKER --> API
 PKG --> VCFG
 ```
 
 **Diagram sources**
-- [index.html:1-14](file://nutricoach/frontend/index.html#L1-L14)
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [LandingPage.vue:1-92](file://nutricoach/frontend/components/LandingPage.vue#L1-L92)
-- [Dashboard.vue:1-46](file://nutricoach/frontend/components/Dashboard.vue#L1-L46)
-- [package.json:1-19](file://nutricoach/frontend/package.json#L1-L19)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+- [App.vue:1-83](file://nutricoach/frontend/src/App.vue#L1-L83)
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
+- [auth.js:1-59](file://nutricoach/frontend/src/stores/auth.js#L1-L59)
+- [user.js:1-40](file://nutricoach/frontend/src/stores/user.js#L1-L40)
+- [api.js:1-33](file://nutricoach/frontend/src/api.js#L1-L33)
+- [Login.vue:1-92](file://nutricoach/frontend/components/Login.vue#L1-L92)
+- [Register.vue:1-96](file://nutricoach/frontend/components/Register.vue#L1-L96)
+- [ProfileSetup.vue:1-184](file://nutricoach/frontend/components/ProfileSetup.vue#L1-L184)
+- [MealPlan.vue:1-178](file://nutricoach/frontend/components/MealPlan.vue#L1-L178)
+- [FoodTracker.vue:1-224](file://nutricoach/frontend/components/FoodTracker.vue#L1-L224)
+- [package.json:1-22](file://nutricoach/frontend/package.json#L1-L22)
 - [vite.config.js:1-17](file://nutricoach/frontend/vite.config.js#L1-L17)
 
 **Section sources**
-- [index.html:1-14](file://nutricoach/frontend/index.html#L1-L14)
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [package.json:1-19](file://nutricoach/frontend/package.json#L1-L19)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+- [App.vue:1-83](file://nutricoach/frontend/src/App.vue#L1-L83)
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
+- [package.json:1-22](file://nutricoach/frontend/package.json#L1-L22)
 - [vite.config.js:1-17](file://nutricoach/frontend/vite.config.js#L1-L17)
 
 ## Core Components
-This section documents the application bootstrap, root component, and routing configuration.
+This section documents the enhanced application bootstrap process, root component with navigation, and comprehensive routing configuration.
 
-- Application Bootstrap (main.js)
-  - Creates the Vue 3 application instance using the root component.
-  - Registers the router plugin.
-  - Mounts the application to the DOM element with id "app".
-  - No additional plugins or global configurations are present in this minimal setup.
+### Application Bootstrap and State Management
+- **Vue 3 Application Creation**: The application is created using `createApp()` with the root component as the foundation.
+- **Pinia Integration**: Pinia state management is initialized globally and provides centralized state management across all components.
+- **Plugin Registration**: Both Pinia and Vue Router plugins are registered during application creation.
+- **Mount Configuration**: The application mounts to the DOM element with id "app" as defined in the HTML structure.
 
-- Root Component (App.vue)
-  - Provides a top-level container with a router outlet.
-  - Serves as the host for all routed views.
-  - Contains no additional logic or styling beyond the outlet.
-
-- Routing Configuration (router.js)
-  - Defines a single route mapping the root path to the landing page component.
-  - Uses browser history mode for routing.
-  - Exports a configured router instance.
+**Updated** Enhanced with Pinia state management for centralized application state
 
 **Section sources**
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+
+### Root Component with Enhanced Navigation
+- **Dynamic Navigation Bar**: The root component now includes a responsive navigation bar that appears on authenticated routes.
+- **Back Navigation**: Implements intelligent back navigation with fallback to home route when history is empty.
+- **Route-based Visibility**: Navigation bar visibility is controlled by computed properties based on current route path.
+- **Global Styling**: Includes comprehensive CSS styling for responsive design and consistent user experience.
+
+**Updated** Added navigation bar with computed visibility and back navigation functionality
+
+**Section sources**
+- [App.vue:1-83](file://nutricoach/frontend/src/App.vue#L1-L83)
+
+### Comprehensive Routing Configuration
+- **Enhanced Route Structure**: Expanded from a single route to seven distinct routes covering authentication, setup, and feature pages.
+- **Authentication Guards**: Implements route guards using `requiresAuth` meta fields to protect authenticated routes.
+- **Navigation Protection**: Prevents access to protected routes without valid authentication tokens.
+- **History Mode**: Maintains browser history mode for clean URL structure and proper navigation semantics.
+
+**Updated** Significantly expanded routing structure with authentication guards and comprehensive component coverage
+
+**Section sources**
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
 
 ## Architecture Overview
-The application follows a straightforward client-side routing model. The Vue instance is mounted in the HTML document, and Vue Router manages navigation between components. The Vite development server proxies API requests to the backend service.
+The application now follows a sophisticated client-side routing model with centralized state management and comprehensive authentication flows. The enhanced architecture supports user registration, authentication, profile setup, and feature-rich nutrition tracking capabilities.
 
 ```mermaid
 sequenceDiagram
@@ -109,194 +163,190 @@ participant HTML as "index.html"
 participant Main as "main.js"
 participant App as "App.vue"
 participant Router as "router.js"
-participant Landing as "LandingPage.vue"
+participant AuthStore as "auth.js"
+participant UserStore as "user.js"
+participant API as "api.js"
 participant Backend as "Backend API"
 Browser->>HTML : Load page
 HTML->>Main : Import and execute
-Main->>App : Create app with root component
-Main->>Router : Register router plugin
+Main->>App : Create Vue 3 app with root component
+Main->>AuthStore : Initialize Pinia store
+Main->>Router : Register router with guards
 App->>Router : Render router-view
-Router->>Landing : Resolve route "/" -> LandingPage
-Landing->>Backend : Submit user data via axios
-Backend-->>Landing : Response
+Router->>Login : Resolve route "/login"
+Login->>AuthStore : Call login action
+AuthStore->>API : POST /auth/login
+API->>Backend : Forward request
+Backend-->>API : Authentication response
+API-->>AuthStore : Token + user data
+AuthStore-->>Login : Success
+Login-->>Router : Redirect to "/dashboard"
+Router->>Dashboard : Render dashboard component
 ```
 
 **Diagram sources**
 - [index.html:1-14](file://nutricoach/frontend/index.html#L1-L14)
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [LandingPage.vue:1-92](file://nutricoach/frontend/components/LandingPage.vue#L1-L92)
-- [API.md:1-59](file://nutricoach/backend/API.md#L1-L59)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+- [App.vue:1-83](file://nutricoach/frontend/src/App.vue#L1-L83)
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
+- [auth.js:1-59](file://nutricoach/frontend/src/stores/auth.js#L1-L59)
+- [api.js:1-33](file://nutricoach/frontend/src/api.js#L1-L33)
 
 ## Detailed Component Analysis
 
-### Application Bootstrap and Initialization
-- Vue Instance Creation
-  - The application is created with the root component and immediately registered with the router.
-  - The mount target aligns with the HTML document’s id attribute.
+### Enhanced Application Bootstrap Process
+- **Vue 3 Modern Features**: Utilizes modern Vue 3 features including Composition API patterns and enhanced reactivity.
+- **State Management Integration**: Pinia provides reactive state management with persistent storage through localStorage integration.
+- **Plugin Ecosystem**: Supports Vue Router for navigation and centralized API service for HTTP communication.
+- **Development Workflow**: Vite provides fast development server with hot module replacement and proxy configuration.
 
-- Plugin Registration
-  - Router plugin is registered during application creation.
-  - No additional plugins are included in this minimal setup.
-
-- Global Configurations
-  - No global configurations are present in the bootstrap code.
-  - Build-time configurations are handled by Vite, including development server and proxy settings.
+**Updated** Migrated to Vue 3 with Pinia state management and enhanced development tooling
 
 **Section sources**
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [index.html:1-14](file://nutricoach/frontend/index.html#L1-L14)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+- [package.json:10-17](file://nutricoach/frontend/package.json#L10-L17)
 - [vite.config.js:1-17](file://nutricoach/frontend/vite.config.js#L1-L17)
 
-### Root Component Structure
-- Template
-  - Hosts a single router outlet to render matched components.
-- Script
-  - Default export with a descriptive component name.
-- Style
-  - No styles are defined in the root component.
+### Authentication Component Suite
+- **Login Component**: Handles user authentication with form validation, error handling, and automatic redirection to dashboard.
+- **Registration Component**: Manages user account creation with validation and automatic login flow.
+- **Profile Setup Component**: Comprehensive health profile collection with medical conditions, dietary preferences, and goal setting.
+- **Form Validation**: Implements comprehensive form validation with real-time feedback and error handling.
+
+**Updated** Added complete authentication and profile management component suite
 
 **Section sources**
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
+- [Login.vue:1-92](file://nutricoach/frontend/components/Login.vue#L1-L92)
+- [Register.vue:1-96](file://nutricoach/frontend/components/Register.vue#L1-L96)
+- [ProfileSetup.vue:1-184](file://nutricoach/frontend/components/ProfileSetup.vue#L1-L184)
 
-### Routing Configuration
-- Route Definitions
-  - Single route mapping the root path to the landing page component.
-  - Additional routes for plans, preferences, and about/contact are referenced in components but not yet defined in the router.
+### Feature-Rich Component Library
+- **Meal Plan Component**: Dynamic meal plan generation with safety warnings, medical condition tailoring, and macro nutrition display.
+- **Food Tracker Component**: Comprehensive food logging system with daily summaries, calorie tracking, and weight monitoring.
+- **Dashboard Component**: Central hub for user progress tracking and quick access to features.
+- **Responsive Design**: Mobile-first approach with adaptive layouts and touch-friendly interfaces.
 
-- Navigation Guards
-  - No navigation guards are implemented in the current router configuration.
-
-- Lazy Loading Strategy
-  - Current implementation imports components synchronously.
-  - Lazy loading can be introduced by dynamically importing components in route definitions.
-
-- History Mode
-  - Uses browser history mode for clean URLs.
+**Updated** Added comprehensive feature components for nutrition tracking and meal planning
 
 **Section sources**
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [LandingPage.vue:6-10](file://nutricoach/frontend/components/LandingPage.vue#L6-L10)
-- [Dashboard.vue:5-7](file://nutricoach/frontend/components/Dashboard.vue#L5-L7)
+- [MealPlan.vue:1-178](file://nutricoach/frontend/components/MealPlan.vue#L1-L178)
+- [FoodTracker.vue:1-224](file://nutricoach/frontend/components/FoodTracker.vue#L1-L224)
 
 ### Component Lifecycle Management
-- Lifecycle Hooks
-  - Components use the Options API with data and methods.
-  - No explicit lifecycle hooks are defined beyond default initialization.
+- **Mounted Hooks**: Components implement appropriate lifecycle hooks for data fetching and initialization.
+- **Computed Properties**: Extensive use of computed properties for derived state and dynamic UI updates.
+- **Event Handling**: Comprehensive event handling for user interactions and form submissions.
+- **Error Boundaries**: Robust error handling with user-friendly error messages and graceful degradation.
 
-- Reactive Data Management
-  - Reactive properties are declared in the data option.
-  - Two-way binding is used with v-model on form inputs.
-
-- Component Communication Patterns
-  - Components communicate primarily through props and events.
-  - Parent-child communication occurs via props and emitted events.
+**Updated** Enhanced with computed properties, lifecycle hooks, and comprehensive error handling
 
 **Section sources**
-- [LandingPage.vue:30-55](file://nutricoach/frontend/components/LandingPage.vue#L30-L55)
-- [Dashboard.vue:27-39](file://nutricoach/frontend/components/Dashboard.vue#L27-L39)
+- [Login.vue:25-44](file://nutricoach/frontend/components/Login.vue#L25-L44)
+- [ProfileSetup.vue:95-131](file://nutricoach/frontend/components/ProfileSetup.vue#L95-L131)
+- [FoodTracker.vue:85-160](file://nutricoach/frontend/components/FoodTracker.vue#L85-L160)
 
-### Dependency Injection Patterns
-- Composition API Usage
-  - The current implementation uses the Options API.
-  - Composition API patterns can be adopted by migrating to script setup and using ref, reactive, and computed.
+## State Management with Pinia
+The application implements a comprehensive state management solution using Pinia, providing centralized control over authentication state, user profiles, and application-wide data.
 
-- Global Services
-  - Axios is imported locally within components for API calls.
-  - A centralized service layer can be introduced to manage HTTP requests and share state.
+### Authentication Store Architecture
+- **State Persistence**: Authentication state persists across browser sessions using localStorage integration.
+- **Token Management**: Automatic JWT token handling with interceptor configuration for secure API communication.
+- **User Context**: Comprehensive user context management including profile data and authentication status.
+- **Action Methods**: Asynchronous action methods for registration, login, user fetching, and logout operations.
+
+### User Profile Store
+- **Profile Management**: Centralized user profile data with update and fetch operations.
+- **Health Calculations**: Integration with health calculation endpoints for personalized nutrition recommendations.
+- **Dashboard Integration**: Provides dashboard summary data for real-time progress tracking.
+- **Data Synchronization**: Automatic data synchronization between local state and backend services.
 
 **Section sources**
-- [LandingPage.vue:28](file://nutricoach/frontend/components/LandingPage.vue#L28)
-- [Dashboard.vue:26](file://nutricoach/frontend/components/Dashboard.vue#L26)
+- [auth.js:1-59](file://nutricoach/frontend/src/stores/auth.js#L1-L59)
+- [user.js:1-40](file://nutricoach/frontend/src/stores/user.js#L1-L40)
 
-### Application Initialization Sequence
-1. The HTML document loads and includes the module script pointing to the main entry.
-2. The main entry creates the Vue application and registers the router.
-3. The root component renders the router outlet.
-4. The router resolves the current route and renders the corresponding component.
-5. Components initialize their reactive data and handle user interactions.
+## Enhanced Routing System
+The routing system has been significantly expanded to support a comprehensive user journey from registration through feature utilization.
 
-```mermaid
-flowchart TD
-Start(["Page Load"]) --> HTML["Load index.html"]
-HTML --> Main["Execute main.js"]
-Main --> CreateApp["Create Vue app with root component"]
-CreateApp --> UseRouter["Register router plugin"]
-UseRouter --> Mount["Mount to #app"]
-Mount --> RenderOutlet["Render router-view"]
-RenderOutlet --> ResolveRoute["Resolve current route"]
-ResolveRoute --> RenderView["Render matched component"]
-RenderView --> Ready(["Application Ready"])
-```
+### Route Configuration Strategy
+- **Authentication Flow**: Sequential routing from landing page through registration, profile setup, to authenticated dashboard.
+- **Protected Routes**: Implementation of route guards protecting sensitive features like meal planning and food tracking.
+- **Navigation Patterns**: Support for both programmatic navigation and user-driven routing through the interface.
+- **Route Meta Fields**: Strategic use of meta fields for authentication requirements and route categorization.
 
-**Diagram sources**
-- [index.html:1-14](file://nutricoach/frontend/index.html#L1-L14)
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
+### Navigation Guard Implementation
+- **Token Validation**: Real-time token validation using localStorage for authentication state verification.
+- **Redirect Logic**: Intelligent redirect logic for unauthenticated users attempting to access protected routes.
+- **Guard Execution**: Pre-navigation guard execution ensuring security and proper user flow progression.
+
+**Section sources**
+- [router.js:10-35](file://nutricoach/frontend/src/router.js#L10-L35)
+- [auth.js:16-56](file://nutricoach/frontend/src/stores/auth.js#L16-L56)
 
 ## Dependency Analysis
-The application depends on Vue 3 and Vue Router for UI and routing, Axios for HTTP requests, and Vite for development and build tooling. The router depends on the presence of components for route resolution.
+The application now leverages a modern Vue 3 ecosystem with comprehensive dependencies supporting state management, routing, and development workflows.
 
 ```mermaid
 graph LR
 Vue["vue@^3.4.0"] --> Main["main.js"]
+Pinia["pinia@^2.1.0"] --> Main
 Router["vue-router@^4.2.0"] --> Main
-Axios["axios@^1.6.0"] --> Landing["LandingPage.vue"]
+Axios["axios@^1.6.0"] --> API["api.js"]
+ChartJS["chart.js@^4.4.0"] --> MealPlan["MealPlan.vue"]
+VueChartJS["vue-chartjs@^5.3.0"] --> MealPlan
 Vite["vite@^5.0.0"] --> VCfg["vite.config.js"]
 VPlugin["@vitejs/plugin-vue@^4.5.0"] --> VCfg
 Main --> App["App.vue"]
 Main --> RouterCfg["router.js"]
-RouterCfg --> Landing
+RouterCfg --> Login["Login.vue"]
+RouterCfg --> Register["Register.vue"]
+RouterCfg --> Profile["ProfileSetup.vue"]
 RouterCfg --> Dashboard["Dashboard.vue"]
-Landing --> Backend["Backend API"]
-Dashboard --> Backend
+RouterCfg --> MealPlan
+RouterCfg --> Tracker["FoodTracker.vue"]
+Login --> AuthStore["auth.js"]
+Register --> AuthStore
+Profile --> UserStore["user.js"]
+MealPlan --> API
+Tracker --> API
+AuthStore --> API
+UserStore --> API
 ```
 
 **Diagram sources**
-- [package.json:10-18](file://nutricoach/frontend/package.json#L10-L18)
-- [main.js:1-6](file://nutricoach/frontend/src/main.js#L1-L6)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [LandingPage.vue:28](file://nutricoach/frontend/components/LandingPage.vue#L28)
+- [package.json:10-17](file://nutricoach/frontend/package.json#L10-L17)
+- [main.js:1-10](file://nutricoach/frontend/src/main.js#L1-L10)
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
+- [auth.js:1-59](file://nutricoach/frontend/src/stores/auth.js#L1-L59)
+- [user.js:1-40](file://nutricoach/frontend/src/stores/user.js#L1-L40)
+- [api.js:1-33](file://nutricoach/frontend/src/api.js#L1-L33)
+- [MealPlan.vue:1-178](file://nutricoach/frontend/components/MealPlan.vue#L1-L178)
 - [vite.config.js:1-17](file://nutricoach/frontend/vite.config.js#L1-L17)
 
 **Section sources**
-- [package.json:1-19](file://nutricoach/frontend/package.json#L1-L19)
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [LandingPage.vue:28](file://nutricoach/frontend/components/LandingPage.vue#L28)
+- [package.json:1-22](file://nutricoach/frontend/package.json#L1-L22)
+- [router.js:1-35](file://nutricoach/frontend/src/router.js#L1-L35)
+- [auth.js:1-59](file://nutricoach/frontend/src/stores/auth.js#L1-L59)
+- [user.js:1-40](file://nutricoach/frontend/src/stores/user.js#L1-L40)
 
 ## Performance Considerations
-- Route-based Lazy Loading
-  - Introduce dynamic imports for route components to reduce initial bundle size.
-- Component Splitting
-  - Extract shared UI elements into reusable components to minimize duplication.
-- HTTP Request Optimization
-  - Centralize API calls behind a service layer to enable caching and deduplication.
-- Dev Server Proxy
-  - Ensure the proxy target matches the backend service address to avoid unnecessary network overhead.
-
-[No sources needed since this section provides general guidance]
+- **State Persistence**: Pinia stores utilize localStorage for state persistence, reducing redundant API calls on page reload.
+- **Lazy Loading**: Route-based lazy loading can be implemented for larger components to optimize initial bundle size.
+- **Component Optimization**: Individual component optimization through computed properties and efficient rendering strategies.
+- **API Caching**: Centralized API service with request/response interceptors for improved network performance.
+- **Chart Optimization**: Chart.js integration optimized for performance with selective data updates.
 
 ## Troubleshooting Guide
-- Route Not Found
-  - Verify that the requested path has a corresponding route definition.
-  - Confirm that the router instance is registered during application creation.
-
-- Component Not Rendering
-  - Ensure the component referenced by the route exists and is exported correctly.
-  - Check that the router outlet is present in the root component template.
-
-- API Requests Failing
-  - Confirm the backend service is running and reachable.
-  - Verify the proxy configuration in Vite matches the backend address.
-  - Review the backend API documentation for endpoint correctness.
+- **Authentication Issues**: Verify token persistence in localStorage and ensure API interceptors are properly configured.
+- **Route Protection**: Check authentication guards and ensure token validation logic is functioning correctly.
+- **State Management**: Monitor Pinia store state updates and localStorage synchronization for data consistency.
+- **API Communication**: Verify baseURL configuration and proxy settings for proper backend communication.
+- **Component Rendering**: Ensure proper component imports and route definitions for seamless navigation.
 
 **Section sources**
-- [router.js:1-14](file://nutricoach/frontend/src/router.js#L1-L14)
-- [App.vue:1-11](file://nutricoach/frontend/src/App.vue#L1-L11)
-- [vite.config.js:9-14](file://nutricoach/frontend/vite.config.js#L9-L14)
-- [API.md:1-59](file://nutricoach/backend/API.md#L1-L59)
+- [router.js:25-32](file://nutricoach/frontend/src/router.js#L25-L32)
+- [auth.js:16-56](file://nutricoach/frontend/src/stores/auth.js#L16-L56)
+- [api.js:10-30](file://nutricoach/frontend/src/api.js#L10-L30)
+- [vite.config.js:7-14](file://nutricoach/frontend/vite.config.js#L7-L14)
 
 ## Conclusion
-NutriCoach AI’s frontend is a minimal Vue 3 application with a focused routing setup and two primary components. The bootstrap process is streamlined, relying on Vue Router for navigation and Axios for backend integration. Extending the application involves adding routes, implementing lazy loading, adopting Composition API patterns, and centralizing service logic for improved maintainability and performance.
+NutriCoach AI has undergone a comprehensive Vue 3 migration featuring Pinia state management, enhanced routing architecture, and a complete component ecosystem. The application now provides a robust foundation for nutrition tracking, meal planning, and user profile management with centralized authentication and state management. The modern architecture supports scalability, maintainability, and enhanced user experience through responsive design and comprehensive feature coverage.

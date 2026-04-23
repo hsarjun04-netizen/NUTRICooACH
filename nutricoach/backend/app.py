@@ -133,6 +133,57 @@ def get_profile():
     return jsonify({key: user[key] for key in user.keys()})
 
 
+@app.route('/api/v1/users/export', methods=['GET'])
+@jwt_required()
+def export_user_data():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # User profile
+    cur.execute('SELECT id, name, email, age, gender, height, weight, goals, activity_level, diet_type, allergies, medical_conditions, budget, created_at FROM users WHERE id = ?', (user_id,))
+    user = cur.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    profile = {key: user[key] for key in user.keys()}
+
+    # Health profile
+    cur.execute('SELECT bmi, bmr, tdee, daily_calories, target_calories, created_at, updated_at FROM health_profiles WHERE user_id = ?', (user_id,))
+    health = cur.fetchone()
+    health_profile = {key: health[key] for key in health.keys()} if health else None
+
+    # Meal plans with meals
+    cur.execute('SELECT id, date, total_calories, created_at FROM meal_plans WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    meal_plans = []
+    for plan_row in cur.fetchall():
+        plan = {key: plan_row[key] for key in plan_row.keys()}
+        cur.execute('SELECT name, calories, protein, carbs, fats, date, meal_type, is_logged, created_at FROM meals WHERE meal_plan_id = ?', (plan['id'],))
+        plan['meals'] = [{key: m[key] for key in m.keys()} for m in cur.fetchall()]
+        meal_plans.append(plan)
+
+    # Weight logs
+    cur.execute('SELECT weight, date, created_at FROM weight_logs WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    weight_logs = [{key: w[key] for key in w.keys()} for w in cur.fetchall()]
+
+    # Logged meals (independent)
+    cur.execute('SELECT name, calories, protein, carbs, fats, date, meal_type, is_logged, created_at FROM meals WHERE user_id = ? AND is_logged = 1 ORDER BY date DESC', (user_id,))
+    logged_meals = [{key: m[key] for key in m.keys()} for m in cur.fetchall()]
+
+    conn.close()
+
+    export_data = {
+        'exported_at': datetime.datetime.now().isoformat(),
+        'profile': profile,
+        'health_profile': health_profile,
+        'meal_plans': meal_plans,
+        'weight_logs': weight_logs,
+        'logged_meals': logged_meals
+    }
+
+    return jsonify(export_data)
+
+
 # ========== HEALTH CALCULATIONS ==========
 
 @app.route('/api/v1/health/calculate', methods=['POST'])

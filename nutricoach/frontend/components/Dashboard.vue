@@ -95,6 +95,9 @@
           <router-link to="/meal-plan" class="quick-link-btn">View Meal Plan</router-link>
           <router-link to="/tracker" class="quick-link-btn">Log Meal</router-link>
           <router-link to="/setup" class="quick-link-btn">Update Profile</router-link>
+          <button class="quick-link-btn export-btn" @click="exportData" :disabled="exporting">
+            {{ exporting ? 'Exporting...' : 'Export My Data' }}
+          </button>
         </div>
       </div>
 
@@ -120,6 +123,7 @@ export default {
       summary: null,
       weightHistory: [],
       circumference: 2 * Math.PI * 40,
+      exporting: false,
       chartOptions: {
         responsive: true,
         plugins: { legend: { display: false } },
@@ -179,6 +183,27 @@ export default {
     formatGoal(goal) {
       if (!goal) return 'Not set'
       return goal.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+    },
+    async exportData() {
+      this.exporting = true
+      try {
+        const response = await api.get('/users/export')
+        const data = response.data
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `nutricoach-data-${data.profile.name || 'user'}-${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      } catch (e) {
+        console.error('Export failed:', e)
+        alert('Failed to export data. Please try again.')
+      } finally {
+        this.exporting = false
+      }
     },
     logout() {
       const auth = useAuthStore()
@@ -266,6 +291,9 @@ h3 { margin: 0 0 12px 0; color: #444; font-size: 1rem; }
   font-weight: bold;
 }
 .quick-link-btn:hover { background: #c8e6c9; }
+.export-btn { background: #e3f2fd; color: #1565c0; border: none; font-family: inherit; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+.export-btn:hover { background: #bbdefb; }
+.export-btn:disabled { background: #e3f2fd; color: #90a4ae; cursor: not-allowed; }
 .loading { text-align: center; padding: 80px; color: #999; }
 @media (max-width: 700px) {
   .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 12px; }

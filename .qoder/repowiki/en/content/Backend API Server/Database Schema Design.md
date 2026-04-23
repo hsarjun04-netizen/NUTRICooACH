@@ -4,11 +4,19 @@
 **Referenced Files in This Document**
 - [schema.sql](file://nutricoach/backend/schema.sql)
 - [init_db.py](file://nutricoach/backend/init_db.py)
-- [init_dp.py](file://nutricoach/backend/init_dp.py)
+- [reset_db.py](file://nutricoach/backend/reset_db.py)
 - [app.py](file://nutricoach/backend/app.py)
 - [API.md](file://nutricoach/backend/API.md)
 - [README.md](file://nutricoach/README.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive database reset functionality documentation
+- Enhanced schema documentation to reflect full meal planning feature support
+- Updated initialization and migration strategies to include reset capabilities
+- Expanded API endpoint coverage for meal planning and health tracking
+- Added database reset procedures and troubleshooting guidance
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -16,19 +24,21 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Database Reset and Maintenance](#database-reset-and-maintenance)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
+11. [Appendices](#appendices)
 
 ## Introduction
-This document provides comprehensive database schema documentation for NutriCoach AI. It covers table definitions, constraints, relationships, initialization and migration strategies, indexing and query patterns, data access patterns, validation rules, and operational best practices. The schema is implemented using SQLite with Python scripts for initialization and a Flask backend for data access.
+This document provides comprehensive database schema documentation for NutriCoach AI. It covers table definitions, constraints, relationships, initialization and migration strategies, database reset functionality, indexing and query patterns, data access patterns, validation rules, and operational best practices. The schema is implemented using SQLite with Python scripts for initialization, reset operations, and a Flask backend for data access.
 
 ## Project Structure
 The database-related assets are primarily located under the backend directory:
 - Schema definition script
 - Initialization scripts for database creation and population
+- Database reset functionality for maintenance operations
 - Flask application for data access
 - API documentation describing endpoints and data models
 
@@ -37,7 +47,7 @@ graph TB
 subgraph "Backend"
 A["schema.sql<br/>Defines tables and constraints"]
 B["init_db.py<br/>Initializes database and tables"]
-C["init_dp.py<br/>Alternative initialization script"]
+C["reset_db.py<br/>Resets database to clean state"]
 D["app.py<br/>Flask API and DB connection"]
 E["API.md<br/>Endpoint and model specs"]
 end
@@ -47,13 +57,13 @@ end
 F --> D
 D --> A
 B --> A
-C --> A
+C --> B
 ```
 
 **Diagram sources**
 - [schema.sql](file://nutricoach/backend/schema.sql)
 - [init_db.py](file://nutricoach/backend/init_db.py)
-- [init_dp.py](file://nutricoach/backend/init_dp.py)
+- [reset_db.py](file://nutricoach/backend/reset_db.py)
 - [app.py](file://nutricoach/backend/app.py)
 - [API.md](file://nutricoach/backend/API.md)
 
@@ -158,7 +168,7 @@ Constraints and Referential Integrity
 - [schema.sql:3-76](file://nutricoach/backend/schema.sql#L3-L76)
 
 ## Architecture Overview
-The backend uses a SQLite database accessed via Python’s sqlite3 module. The Flask application exposes REST endpoints that map to CRUD operations on the schema-defined tables. Initialization scripts create the database and tables.
+The backend uses a SQLite database accessed via Python's sqlite3 module. The Flask application exposes REST endpoints that map to CRUD operations on the schema-defined tables. Initialization scripts create the database and tables, while the reset functionality provides maintenance capabilities.
 
 ```mermaid
 graph TB
@@ -166,11 +176,14 @@ Client["Client (Browser/Vue SPA)"] --> API["Flask API (/api/v1/*)"]
 API --> Conn["SQLite Connection"]
 Conn --> DB["SQLite Database (.db file)"]
 DB --> Tables["Tables: users, health_profiles, diet_preferences,<br/>meal_plans, meals, weight_logs"]
+API --> Reset["Reset Functionality"]
+Reset --> Init["Initialization Scripts"]
 ```
 
 **Diagram sources**
 - [app.py:11-14](file://nutricoach/backend/app.py#L11-L14)
 - [schema.sql:3-76](file://nutricoach/backend/schema.sql#L3-L76)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
 
 **Section sources**
 - [app.py:1-31](file://nutricoach/backend/app.py#L1-L31)
@@ -265,44 +278,57 @@ The Flask application demonstrates direct SQL insertion against the users table.
   - Payload fields: name, email, age, weight, height, goals
   - Implementation pattern: INSERT INTO users (...) VALUES (?, ?, ?, ?, ?, ?)
 
-- Additional Endpoints (as documented)
-  - GET /api/v1/users/{user_id}
-  - PUT /api/v1/users/{user_id}
-  - DELETE /api/v1/users/{user_id}
-  - POST /api/v1/diet-preferences
-  - GET /api/v1/diet-preferences/{user_id}
-  - POST /api/v1/meal-plans
-  - GET /api/v1/meal-plans/{user_id}
-  - GET /api/v1/meal-plans/{user_id}/history
+- Authentication Endpoints
+  - POST /api/v1/auth/register - User registration with password hashing
+  - POST /api/v1/auth/login - User authentication with JWT token generation
+  - GET /api/v1/auth/me - Current user profile retrieval
+
+- Health Calculation Endpoints
+  - POST /api/v1/health/calculate - BMI, BMR, TDEE calculation and storage
+  - GET /api/v1/health/profile - Health profile retrieval
+
+- Meal Planning Endpoints
+  - POST /api/v1/meal-plans/generate - Generate and save personalized meal plan
+  - GET /api/v1/meal-plans/current - Retrieve current day's meal plan
+  - GET /api/v1/meal-plans/{user_id}/history - Retrieve meal plan history
+
+- Food Tracking Endpoints
+  - POST /api/v1/meals/log - Log custom meals
+  - GET /api/v1/meals/today - Retrieve today's logged meals
+
+- Weight Tracking Endpoints
+  - POST /api/v1/weight/log - Log weight entries
+  - GET /api/v1/weight/history - Retrieve weight history
 
 ```mermaid
 sequenceDiagram
 participant Client as "Client"
 participant API as "Flask app.py"
 participant DB as "SQLite DB"
-Client->>API : POST /api/v1/users
-API->>API : parse JSON request
+Client->>API : POST /api/v1/auth/register
+API->>API : hash password
 API->>DB : INSERT INTO users (...)
 DB-->>API : lastrowid
-API-->>Client : 201 Created with user id
+API->>API : create JWT token
+API-->>Client : 201 Created with token
 ```
 
 **Diagram sources**
-- [app.py:16-26](file://nutricoach/backend/app.py#L16-L26)
-- [API.md:6-10](file://nutricoach/backend/API.md#L6-L10)
+- [app.py:27-52](file://nutricoach/backend/app.py#L27-L52)
+- [API.md:6-24](file://nutricoach/backend/API.md#L6-L24)
 
 **Section sources**
-- [app.py:16-26](file://nutricoach/backend/app.py#L16-L26)
+- [app.py:27-52](file://nutricoach/backend/app.py#L27-L52)
 - [API.md:6-59](file://nutricoach/backend/API.md#L6-L59)
 
 ### Initialization and Migration Strategies
 - Initialization Scripts
   - init_db.py: Creates users, diet_preferences, and meal_plans tables and establishes foreign keys.
-  - init_dp.py: Creates a minimal users table (used for early setup).
+  - reset_db.py: Provides database reset functionality by deleting the old database and reinitializing tables.
 - Schema Definition
   - schema.sql: Defines the authoritative schema including health_profiles, diet_preferences, meal_plans, meals, and weight_logs with comprehensive constraints.
 - Migration Strategy
-  - Current state: The project initializes tables via Python scripts and does not include explicit migration tooling.
+  - Current state: The project initializes tables via Python scripts and provides reset functionality for maintenance.
   - Recommended approach:
     - Use a lightweight migration library (e.g., sqlite-migrations) to manage schema changes.
     - Version control migrations alongside schema.sql.
@@ -310,8 +336,8 @@ API-->>Client : 201 Created with user id
   - For adding indexes or constraints in future iterations, wrap DDL statements in conditional checks to avoid failures on existing databases.
 
 **Section sources**
-- [init_db.py:9-42](file://nutricoach/backend/init_db.py#L9-L42)
-- [init_dp.py:8-18](file://nutricoach/backend/init_dp.py#L8-L18)
+- [init_db.py:9-106](file://nutricoach/backend/init_db.py#L9-L106)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
 - [schema.sql:3-76](file://nutricoach/backend/schema.sql#L3-L76)
 - [README.md:43-47](file://nutricoach/README.md#L43-L47)
 
@@ -363,28 +389,70 @@ API-->>Client : 201 Created with user id
 - [schema.sql:40-41](file://nutricoach/backend/schema.sql#L40-L41)
 - [schema.sql:66-66](file://nutricoach/backend/schema.sql#L66-L66)
 
+## Database Reset and Maintenance
+
+### Database Reset Functionality
+The application now includes comprehensive database reset capabilities through the reset_db.py script, which provides a clean slate for development and testing environments.
+
+**Reset Process Flow:**
+1. **Database Detection**: Script checks for existing database file at DB_PATH
+2. **Deletion**: Removes the existing database file if present
+3. **Reinitialization**: Executes init_db.py to recreate all tables and constraints
+4. **Verification**: Prints success message upon completion
+
+```mermaid
+flowchart TD
+A["Start Reset Process"] --> B{"Database Exists?"}
+B --> |Yes| C["Delete Old Database File"]
+B --> |No| D["Skip Deletion"]
+C --> E["Execute init_db.py"]
+D --> E
+E --> F["Recreate All Tables"]
+F --> G["Establish Foreign Key Constraints"]
+G --> H["Print Success Message"]
+H --> I["Reset Complete"]
+```
+
+**Diagram sources**
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
+
+### Reset Usage Scenarios
+- **Development Environment**: Clean database state for testing new features
+- **Data Corruption Recovery**: Restore database to known good state
+- **Schema Changes Testing**: Fresh database after schema modifications
+- **Demo Environments**: Clean slate for presentations and demonstrations
+
+### Reset Command Execution
+```bash
+cd nutricoach/backend
+python reset_db.py
+```
+
+**Section sources**
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
+
 ## Dependency Analysis
-The backend depends on Python’s sqlite3 module and the Flask framework. The database schema is defined centrally and consumed by both initialization scripts and the Flask application.
+The backend depends on Python's sqlite3 module and the Flask framework. The database schema is defined centrally and consumed by both initialization scripts, reset functionality, and the Flask application.
 
 ```mermaid
 graph LR
 Flask["Flask app.py"] --> sqlite3["sqlite3 module"]
 sqlite3 --> DB["database.db"]
 InitA["init_db.py"] --> DB
-InitB["init_dp.py"] --> DB
+Reset["reset_db.py"] --> InitA
 Schema["schema.sql"] --> DB
 ```
 
 **Diagram sources**
 - [app.py:1-31](file://nutricoach/backend/app.py#L1-L31)
-- [init_db.py:1-47](file://nutricoach/backend/init_db.py#L1-L47)
-- [init_dp.py:1-23](file://nutricoach/backend/init_dp.py#L1-L23)
+- [init_db.py:1-106](file://nutricoach/backend/init_db.py#L1-L106)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
 - [schema.sql:1-77](file://nutricoach/backend/schema.sql#L1-L77)
 
 **Section sources**
 - [app.py:1-31](file://nutricoach/backend/app.py#L1-L31)
-- [init_db.py:1-47](file://nutricoach/backend/init_db.py#L1-L47)
-- [init_dp.py:1-23](file://nutricoach/backend/init_dp.py#L1-L23)
+- [init_db.py:1-106](file://nutricoach/backend/init_db.py#L1-L106)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
 - [schema.sql:1-77](file://nutricoach/backend/schema.sql#L1-L77)
 
 ## Performance Considerations
@@ -393,8 +461,7 @@ Schema["schema.sql"] --> DB
 - Indexing: Add composite indexes for common filter-and-sort patterns (user_id + date, user_id + created_at).
 - Query Size Limits: Paginate results for endpoints returning lists (e.g., meal plan history).
 - Vacuum/Integrity Checks: Periodically run VACUUM and PRAGMA integrity_check in production deployments.
-
-[No sources needed since this section provides general guidance]
+- Reset Performance: The reset functionality provides a clean database state without manual cleanup operations.
 
 ## Troubleshooting Guide
 - Database Initialization Failures
@@ -408,16 +475,19 @@ Schema["schema.sql"] --> DB
   - Foreign key errors suggest missing parent records; validate user_id presence before inserts.
 - Migration Conflicts
   - If schema evolves, apply migrations before starting the application to avoid runtime errors.
+- Reset Issues
+  - Permission errors during reset: Ensure write permissions for the backend directory.
+  - Reset fails silently: Check Python environment and dependencies are properly installed.
+  - Database not found after reset: Verify the database.db file is created in the expected location.
 
 **Section sources**
 - [README.md:43-47](file://nutricoach/README.md#L43-L47)
 - [app.py:9-14](file://nutricoach/backend/app.py#L9-L14)
 - [schema.sql:3-76](file://nutricoach/backend/schema.sql#L3-L76)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
 
 ## Conclusion
-NutriCoach AI employs a straightforward SQLite schema centered around users, health metrics, dietary preferences, meal plans, meals, and weight logs. The schema enforces referential integrity and key constraints, while the Flask backend provides a minimal but extensible foundation for data access. To scale, introduce indexing, migrations, and connection pooling, and expand the API coverage to align with the documented models.
-
-[No sources needed since this section summarizes without analyzing specific files]
+NutriCoach AI employs a comprehensive SQLite schema centered around users, health metrics, dietary preferences, meal plans, meals, and weight logs. The schema enforces referential integrity and key constraints, while the Flask backend provides a robust foundation for data access with enhanced meal planning features. The addition of database reset functionality provides essential maintenance capabilities for development and testing environments. To scale, introduce indexing, migrations, and connection pooling, and expand the API coverage to align with the documented models.
 
 ## Appendices
 
@@ -429,5 +499,11 @@ NutriCoach AI employs a straightforward SQLite schema centered around users, hea
 - Meal Plan
   - Fields: id, user_id, date, total_calories, created_at
 
+### Appendix B: Database Reset Commands
+- **Full Reset**: `python reset_db.py`
+- **Manual Cleanup**: Remove database.db file manually, then run initialization scripts
+- **Verification**: Check that all tables are recreated after reset operation
+
 **Section sources**
 - [API.md:29-59](file://nutricoach/backend/API.md#L29-L59)
+- [reset_db.py:1-13](file://nutricoach/backend/reset_db.py#L1-L13)
