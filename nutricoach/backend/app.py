@@ -486,6 +486,19 @@ def dashboard_summary():
         diff = abs(latest_weight['weight'] - start_weight['weight'])
         goal_progress = min(round((diff / start_weight['weight']) * 100, 1), 100)
 
+    # Water intake
+    cur.execute('SELECT amount_ml FROM water_logs WHERE user_id = ? AND date = ?', (user_id, today))
+    water_entries = cur.fetchall()
+    water_intake = sum(w['amount_ml'] for w in water_entries)
+
+    conn.close()
+
+    target = health['target_calories'] if health else 2000
+    goal_progress = 0
+    if start_weight and latest_weight and start_weight['weight']:
+        diff = abs(latest_weight['weight'] - start_weight['weight'])
+        goal_progress = min(round((diff / start_weight['weight']) * 100, 1), 100)
+
     return jsonify({
         'name': user['name'] if user else None,
         'goal': user['goals'] if user else None,
@@ -495,8 +508,164 @@ def dashboard_summary():
         'consumed_calories': consumed,
         'remaining_calories': round(target - consumed, 0),
         'latest_weight': latest_weight['weight'] if latest_weight else None,
-        'goal_progress_percent': goal_progress
+        'goal_progress_percent': goal_progress,
+        'water_intake': water_intake
     })
+
+
+# ========== WATER INTAKE ==========
+
+@app.route('/api/v1/water/log', methods=['POST'])
+@jwt_required()
+def log_water():
+    user_id = get_jwt_identity()
+    data = request.json
+    amount = data.get('amount_ml', 250)
+    date = data.get('date', datetime.date.today().isoformat())
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('INSERT INTO water_logs (user_id, amount_ml, date) VALUES (?, ?, ?)',
+                (user_id, amount, date))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': 'Water logged'}), 201
+
+
+@app.route('/api/v1/water/today', methods=['GET'])
+@jwt_required()
+def get_water_today():
+    user_id = get_jwt_identity()
+    today = datetime.date.today().isoformat()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT amount_ml FROM water_logs WHERE user_id = ? AND date = ?', (user_id, today))
+    entries = cur.fetchall()
+    conn.close()
+    total = sum(e['amount_ml'] for e in entries)
+    return jsonify({'total_ml': total, 'entries': len(entries)})
+
+
+# ========== AI CHAT ==========
+
+def generate_chat_response(message, user_profile, health_profile):
+    msg = message.lower()
+    responses = []
+
+    # Greeting
+    if any(w in msg for w in ['hi', 'hello', 'hey', 'namaste']):
+        return f"Hello {user_profile.get('name', 'there')}! I'm your NutriCoach AI. Ask me about nutrition, meal plans, or your health goals."
+
+    # Calorie questions
+    if any(w in msg for w in ['calorie', 'calories', 'how many calories', 'kcal']):
+        if health_profile and health_profile.get('target_calories'):
+            return f"Your daily calorie target is {health_profile['target_calories']} kcal based on your BMR ({health_profile.get('bmr', 'N/A')} kcal) and activity level."
+        return "To calculate your daily calorie needs, please complete your profile with age, height, weight, gender, and activity level."
+
+    # Weight loss
+    if any(w in msg for w in ['lose weight', 'weight loss', 'fat loss', 'slimming']):
+        if health_profile:
+            deficit = health_profile.get('target_calories', 2000)
+            return f"For healthy weight loss, aim for a moderate calorie deficit. Your target is {deficit} kcal/day. Focus on high-protein, high-fiber foods and regular exercise."
+        return "For weight loss, aim for a 300-500 kcal deficit from your TDEE. Would you like a meal plan designed for weight loss?"
+
+    # Protein
+    if 'protein' in msg:
+        weight = user_profile.get('weight', 70)
+        target_protein = round(weight * 1.6, 0)
+        return f"For your weight ({weight} kg), aim for about {target_protein}g of protein daily. Good sources: eggs, chicken, lentils, paneer, and Greek yogurt."
+
+    # Water
+    if any(w in msg for w in ['water', 'hydration', 'drink']):
+        weight = user_profile.get('weight', 70)
+        rec_water = round(weight * 35, 0)
+        return f"You should drink about {rec_water}ml (around {round(rec_water/250, 1)} glasses) of water daily. Stay hydrated!"
+
+    # BMI
+    if any(w in msg for w in ['bmi', 'body mass index']):
+        if health_profile and health_profile.get('bmi'):
+            bmi = health_profile['bmi']
+            status = 'underweight' if bmi < 18.5 else 'normal' if bmi < 25 else 'overweight' if bmi < 30 else 'obese'
+            return f"Your BMI is {bmi}, which falls in the {status} range. Remember, BMI is just one indicator of health."
+        return "Complete your profile to calculate your BMI. It's based on your height and weight."
+
+    # Meal suggestions
+    if any(w in msg for w in ['what should i eat', 'meal idea', 'food suggestion', 'hungry']):
+        diet = user_profile.get('diet_type', 'balanced')
+        conditions = user_profile.get('medical_conditions', '')
+        resp = "Here are some healthy options: "
+        if 'veg' in diet:
+            resp += "Daliya with milk, moong dal khichdi, mixed vegetable sabzi with roti, or a bowl of fresh fruits."
+        else:
+            resp += "Grilled chicken breast, egg bhurji with roti, fish curry with brown rice, or a Greek yogurt parfait."
+        if conditions:
+            resp += f" I've also considered your medical conditions ({conditions}) in these suggestions."
+        return resp
+
+    # Exercise
+    if any(w in msg for w in ['exercise', 'workout', 'gym', 'cardio', 'training']):
+        return "Aim for 150 minutes of moderate exercise per week. Combine cardio (walking, jogging) with strength training 2-3 times per week for best results."
+
+    # Sleep
+    if any(w in msg for w in ['sleep', 'rest', 'recovery']):
+        return "Quality sleep is crucial for weight management. Aim for 7-9 hours per night. Poor sleep increases hunger hormones and cravings."
+
+    # Thank you
+    if any(w in msg for w in ['thank', 'thanks', 'dhanyawad']):
+        return "You're welcome! Stay healthy and feel free to ask anytime."
+
+    # Default
+    return "I'm your NutriCoach AI assistant. I can help with nutrition advice, meal suggestions, calorie calculations, and health tips based on your profile. What would you like to know?"
+
+
+@app.route('/api/v1/chat', methods=['POST'])
+@jwt_required()
+def chat():
+    user_id = get_jwt_identity()
+    data = request.json
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Message is required'}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Store user message
+    cur.execute('INSERT INTO chat_messages (user_id, role, message) VALUES (?, ?, ?)',
+                (user_id, 'user', message))
+
+    # Get user profile
+    cur.execute('SELECT name, age, gender, height, weight, goals, activity_level, diet_type, allergies, medical_conditions FROM users WHERE id = ?', (user_id,))
+    user_profile = cur.fetchone()
+    user_profile = {k: user_profile[k] for k in user_profile.keys()} if user_profile else {}
+
+    # Get health profile
+    cur.execute('SELECT bmi, bmr, tdee, target_calories FROM health_profiles WHERE user_id = ?', (user_id,))
+    health = cur.fetchone()
+    health_profile = {k: health[k] for k in health.keys()} if health else {}
+
+    # Generate response
+    response_text = generate_chat_response(message, user_profile, health_profile)
+
+    # Store AI response
+    cur.execute('INSERT INTO chat_messages (user_id, role, message) VALUES (?, ?, ?)',
+                (user_id, 'assistant', response_text))
+
+    conn.commit()
+    conn.close()
+    return jsonify({'response': response_text})
+
+
+@app.route('/api/v1/chat/history', methods=['GET'])
+@jwt_required()
+def get_chat_history():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT role, message, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC', (user_id,))
+    messages = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    conn.close()
+    return jsonify({'messages': messages})
 
 
 # ========== LEGACY ENDPOINT ==========

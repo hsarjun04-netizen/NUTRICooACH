@@ -1,25 +1,23 @@
 <template>
   <div class="tracker-page">
-    <header class="page-header">
-      <h2>Food Tracker</h2>
-    </header>
+    <div class="tracker-container">
+      <div class="page-header">
+        <h1>Meal Tracker</h1>
+        <p class="subtitle">Log your meals and track your nutrition</p>
+      </div>
 
-    <div class="tracker-layout">
-      <div class="log-section">
-        <h3>Log a Meal</h3>
+      <!-- Add Meal Form -->
+      <div class="card form-card">
+        <h3>Add a Meal</h3>
         <form @submit.prevent="logMeal">
-          <div class="form-group">
-            <label>Food Name</label>
-            <input type="text" v-model="form.name" required placeholder="e.g., Roti with Dal" />
-          </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Calories</label>
-              <input type="number" v-model.number="form.calories" placeholder="0" min="0" />
+              <label>Meal Name</label>
+              <input v-model="mealForm.name" type="text" placeholder="e.g., Grilled Chicken Salad" required />
             </div>
-            <div class="form-group">
-              <label>Meal Type</label>
-              <select v-model="form.meal_type">
+            <div class="form-group small">
+              <label>Type</label>
+              <select v-model="mealForm.meal_type">
                 <option value="breakfast">Breakfast</option>
                 <option value="lunch">Lunch</option>
                 <option value="dinner">Dinner</option>
@@ -27,57 +25,80 @@
               </select>
             </div>
           </div>
-          <div class="form-row">
+          <div class="form-row macros">
+            <div class="form-group">
+              <label>Calories</label>
+              <input v-model.number="mealForm.calories" type="number" placeholder="0" min="0" />
+            </div>
             <div class="form-group">
               <label>Protein (g)</label>
-              <input type="number" v-model.number="form.protein" placeholder="0" min="0" step="0.1" />
+              <input v-model.number="mealForm.protein" type="number" placeholder="0" min="0" />
             </div>
             <div class="form-group">
               <label>Carbs (g)</label>
-              <input type="number" v-model.number="form.carbs" placeholder="0" min="0" step="0.1" />
+              <input v-model.number="mealForm.carbs" type="number" placeholder="0" min="0" />
             </div>
             <div class="form-group">
               <label>Fats (g)</label>
-              <input type="number" v-model.number="form.fats" placeholder="0" min="0" step="0.1" />
+              <input v-model.number="mealForm.fats" type="number" placeholder="0" min="0" />
             </div>
           </div>
-          <button type="submit" :disabled="logging">{{ logging ? 'Logging...' : 'Log Meal' }}</button>
+          <button type="submit" :disabled="saving" class="submit-btn">{{ saving ? 'Saving...' : 'Log Meal' }}</button>
         </form>
       </div>
 
-      <div class="today-section">
-        <h3>Today's Log</h3>
-        <div class="calorie-summary">
-          <div class="calorie-bar">
-            <div class="calorie-fill" :style="{ width: caloriePercent + '%' }"></div>
-          </div>
-          <p>{{ todayTotal }} / {{ targetCalories }} kcal</p>
+      <!-- Today's Summary -->
+      <div class="summary-bar">
+        <div class="summary-item">
+          <span class="summary-value">{{ todayCalories }}</span>
+          <span class="summary-label">kcal</span>
         </div>
-
-        <div v-if="todayMeals.length" class="meals-list">
-          <div v-for="meal in todayMeals" :key="meal.id" class="meal-item">
-            <div class="meal-info">
-              <span class="meal-type-tag">{{ meal.meal_type }}</span>
-              <strong>{{ meal.name }}</strong>
-            </div>
-            <div class="meal-macros">
-              <span>{{ meal.calories }} kcal</span>
-              <span>P:{{ meal.protein }}g</span>
-              <span>C:{{ meal.carbs }}g</span>
-              <span>F:{{ meal.fats }}g</span>
-            </div>
-          </div>
+        <div class="summary-item">
+          <span class="summary-value">{{ todayProtein }}g</span>
+          <span class="summary-label">Protein</span>
         </div>
-        <p v-else class="empty">No meals logged today.</p>
+        <div class="summary-item">
+          <span class="summary-value">{{ todayCarbs }}g</span>
+          <span class="summary-label">Carbs</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-value">{{ todayFats }}g</span>
+          <span class="summary-label">Fats</span>
+        </div>
       </div>
-    </div>
 
-    <div class="weight-section">
-      <h3>Log Weight</h3>
-      <form @submit.prevent="logWeight" class="weight-form">
-        <input type="number" v-model.number="weightInput" required placeholder="Weight in kg" step="0.1" min="20" />
-        <button type="submit" :disabled="weightLogging">{{ weightLogging ? 'Saving...' : 'Log Weight' }}</button>
-      </form>
+      <!-- Meal Cards -->
+      <div class="meals-section">
+        <h3>Today's Meals</h3>
+        <div v-if="meals.length" class="meals-grid">
+          <div v-for="meal in meals" :key="meal.id" class="meal-card" :class="meal.meal_type">
+            <div class="meal-header">
+              <span class="meal-type-badge">{{ meal.meal_type }}</span>
+              <span class="meal-calories">{{ meal.calories }} kcal</span>
+            </div>
+            <div class="meal-name">{{ meal.name }}</div>
+            <div class="meal-macros">
+              <span>P: {{ meal.protein || 0 }}g</span>
+              <span>C: {{ meal.carbs || 0 }}g</span>
+              <span>F: {{ meal.fats || 0 }}g</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <p>No meals logged today. Start by adding your first meal above!</p>
+        </div>
+      </div>
+
+      <!-- Log Weight -->
+      <div class="card weight-card">
+        <h3>Log Weight</h3>
+        <form @submit.prevent="logWeight">
+          <div class="weight-row">
+            <input v-model.number="weightForm.weight" type="number" step="0.1" placeholder="Weight in kg" required />
+            <button type="submit" :disabled="savingWeight">{{ savingWeight ? 'Saving...' : 'Log Weight' }}</button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
@@ -88,72 +109,70 @@ import api from '../src/api'
 export default {
   data() {
     return {
-      form: { name: '', calories: null, protein: null, carbs: null, fats: null, meal_type: 'lunch' },
-      todayMeals: [],
-      todayTotal: 0,
-      targetCalories: 2000,
-      logging: false,
-      weightInput: null,
-      weightLogging: false
+      meals: [],
+      mealForm: {
+        name: '',
+        calories: null,
+        protein: null,
+        carbs: null,
+        fats: null,
+        meal_type: 'breakfast'
+      },
+      weightForm: { weight: null },
+      saving: false,
+      savingWeight: false
     }
   },
   computed: {
-    caloriePercent() {
-      return Math.min((this.todayTotal / this.targetCalories) * 100, 100)
+    todayCalories() {
+      return this.meals.reduce((sum, m) => sum + (m.calories || 0), 0)
+    },
+    todayProtein() {
+      return this.meals.reduce((sum, m) => sum + (m.protein || 0), 0)
+    },
+    todayCarbs() {
+      return this.meals.reduce((sum, m) => sum + (m.carbs || 0), 0)
+    },
+    todayFats() {
+      return this.meals.reduce((sum, m) => sum + (m.fats || 0), 0)
     }
   },
   mounted() {
-    this.loadTodayMeals()
-    this.loadTarget()
+    this.loadMeals()
   },
   methods: {
-    async loadTodayMeals() {
+    async loadMeals() {
       try {
-        const response = await api.get('/meals/today')
-        this.todayMeals = response.data.meals
-        this.todayTotal = response.data.total_calories
+        const res = await api.get('/meals/today')
+        this.meals = res.data.meals || []
       } catch (e) {
         console.error('Failed to load meals:', e)
       }
     },
-    async loadTarget() {
-      try {
-        const response = await api.get('/health/profile')
-        if (response.data.target_calories) {
-          this.targetCalories = response.data.target_calories
-        }
-      } catch (e) {
-        // May not exist yet, use default
-      }
-    },
     async logMeal() {
-      this.logging = true
+      this.saving = true
       try {
-        await api.post('/meals/log', {
-          name: this.form.name,
-          calories: this.form.calories || 0,
-          protein: this.form.protein || 0,
-          carbs: this.form.carbs || 0,
-          fats: this.form.fats || 0,
-          meal_type: this.form.meal_type
-        })
-        this.form = { name: '', calories: null, protein: null, carbs: null, fats: null, meal_type: 'lunch' }
-        await this.loadTodayMeals()
+        await api.post('/meals/log', this.mealForm)
+        this.mealForm = { name: '', calories: null, protein: null, carbs: null, fats: null, meal_type: 'breakfast' }
+        await this.loadMeals()
       } catch (e) {
         console.error('Failed to log meal:', e)
+        alert('Failed to log meal')
       } finally {
-        this.logging = false
+        this.saving = false
       }
     },
     async logWeight() {
-      this.weightLogging = true
+      this.savingWeight = true
       try {
-        await api.post('/weight/log', { weight: this.weightInput })
-        this.weightInput = null
+        await api.post('/weight/log', this.weightForm)
+        this.weightForm.weight = null
+        alert('Weight logged successfully!')
       } catch (e) {
         console.error('Failed to log weight:', e)
+        alert('Failed to log weight')
       } finally {
-        this.weightLogging = false
+        this.savingWeight = false
       }
     }
   }
@@ -161,63 +180,110 @@ export default {
 </script>
 
 <style scoped>
-.tracker-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 30px 20px;
-  font-family: Arial, sans-serif;
+.tracker-page { max-width: 800px; margin: 0 auto; padding: 32px 20px; font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+.tracker-container { display: flex; flex-direction: column; gap: 20px; }
+.page-header { margin-bottom: 4px; }
+.page-header h1 { margin: 0; font-size: 1.5rem; color: #1a1a2e; }
+.subtitle { margin: 4px 0 0 0; color: #888; font-size: 0.9rem; }
+
+.card {
+  background: white;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-h2 { color: #333; }
-h3 { color: #555; margin-bottom: 12px; }
-.tracker-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
-.form-group { margin-bottom: 10px; }
-.form-row { display: flex; gap: 10px; }
+.card h3 { margin: 0 0 16px 0; font-size: 1rem; color: #333; }
+
+.form-row { display: flex; gap: 14px; margin-bottom: 14px; }
 .form-row .form-group { flex: 1; }
-label { display: block; margin-bottom: 2px; color: #555; font-size: 0.85rem; }
-input, select {
+.form-row .form-group.small { flex: 0.4; }
+.form-group label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: #666; font-weight: 500; }
+.form-group input, .form-group select {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
   font-size: 0.95rem;
   box-sizing: border-box;
+  background: #fafafa;
 }
-button {
-  padding: 10px 20px;
-  background-color: #4CAF50;
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #4CAF50; background: white; }
+
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background: #4CAF50;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  width: 100%;
+  margin-top: 4px;
 }
-button:hover { background-color: #45a049; }
-button:disabled { background-color: #a5d6a7; cursor: not-allowed; }
-.log-section, .today-section { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.calorie-summary { margin-bottom: 16px; }
-.calorie-bar { background: #e0e0e0; border-radius: 8px; height: 12px; overflow: hidden; margin-bottom: 6px; }
-.calorie-fill { background: #4CAF50; height: 100%; border-radius: 8px; transition: width 0.3s; }
-.calorie-summary p { margin: 0; font-size: 0.85rem; color: #666; text-align: center; }
-.meals-list { max-height: 300px; overflow-y: auto; }
-.meal-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
-.meal-info { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.meal-type-tag {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
+.submit-btn:hover { background: #45a049; }
+.submit-btn:disabled { background: #a5d6a7; cursor: not-allowed; }
+
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.summary-item {
+  background: white;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.summary-value { display: block; font-size: 1.4rem; font-weight: 700; color: #1a1a2e; }
+.summary-label { font-size: 0.75rem; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.meals-section h3 { margin: 8px 0 14px 0; font-size: 1rem; color: #333; }
+.meals-grid { display: flex; flex-direction: column; gap: 12px; }
+.meal-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border-left: 4px solid #ccc;
+}
+.meal-card.breakfast { border-left-color: #FF9800; }
+.meal-card.lunch { border-left-color: #4CAF50; }
+.meal-card.dinner { border-left-color: #2196F3; }
+.meal-card.snack { border-left-color: #9c27b0; }
+.meal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.meal-type-badge {
   font-size: 0.7rem;
-  background: #e8f5e9;
-  color: #2e7d32;
-  font-weight: bold;
-  text-transform: capitalize;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 0.5px;
 }
-.meal-macros { display: flex; gap: 10px; color: #888; font-size: 0.8rem; }
-.empty { color: #999; text-align: center; padding: 20px; }
-.weight-section { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-.weight-form { display: flex; gap: 12px; align-items: flex-end; }
-.weight-form input { flex: 1; }
-.weight-form button { width: auto; }
-@media (max-width: 700px) {
-  .tracker-layout { grid-template-columns: 1fr; }
+.meal-calories { font-size: 0.85rem; font-weight: 700; color: #2e7d32; }
+.meal-name { font-size: 1rem; font-weight: 600; color: #333; margin-bottom: 8px; }
+.meal-macros { display: flex; gap: 16px; }
+.meal-macros span { font-size: 0.8rem; color: #888; }
+
+.empty-state { text-align: center; padding: 30px; color: #bbb; font-size: 0.9rem; }
+
+.weight-card .weight-row { display: flex; gap: 12px; }
+.weight-card input { flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem; }
+.weight-card button {
+  padding: 10px 20px;
+  background: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.weight-card button:hover { background: #1976d2; }
+.weight-card button:disabled { background: #90caf9; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .form-row { flex-direction: column; gap: 10px; }
+  .form-row.macros { display: grid; grid-template-columns: 1fr 1fr; }
+  .summary-bar { grid-template-columns: 1fr 1fr; }
 }
 </style>

@@ -7,6 +7,8 @@ import Dashboard from '../components/Dashboard.vue'
 import MealPlan from '../components/MealPlan.vue'
 import FoodTracker from '../components/FoodTracker.vue'
 import Profile from '../components/Profile.vue'
+import Chat from '../components/Chat.vue'
+import Progress from '../components/Progress.vue'
 
 const routes = [
   { path: '/', component: LandingPage },
@@ -16,7 +18,9 @@ const routes = [
   { path: '/profile', component: Profile, meta: { requiresAuth: true } },
   { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/meal-plan', component: MealPlan, meta: { requiresAuth: true } },
-  { path: '/tracker', component: FoodTracker, meta: { requiresAuth: true } }
+  { path: '/tracker', component: FoodTracker, meta: { requiresAuth: true } },
+  { path: '/chat', component: Chat, meta: { requiresAuth: true } },
+  { path: '/progress', component: Progress, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({
