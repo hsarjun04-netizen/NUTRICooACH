@@ -58,38 +58,45 @@ export default {
   font-family: Arial, sans-serif;
 }
 .auth-card {
-  background: white;
+  background: var(--bg-card);
   padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   width: 100%;
   max-width: 400px;
+  transition: all var(--transition-slow);
 }
-h2 { text-align: center; color: #333; margin-bottom: 24px; }
+h2 { text-align: center; color: var(--text-primary); margin-bottom: 24px; transition: color var(--transition-slow); }
 .form-group { margin-bottom: 16px; }
-label { display: block; margin-bottom: 4px; color: #555; font-size: 0.9rem; }
+label { display: block; margin-bottom: 4px; color: var(--text-secondary); font-size: 0.9rem; transition: color var(--transition-slow); }
 input {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   box-sizing: border-box;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  transition: all var(--transition-base);
 }
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15); outline: none; }
 button {
   width: 100%;
   padding: 12px;
-  background-color: #4CAF50;
-  color: white;
+  background: var(--text-primary);
+  color: var(--bg-card);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
   margin-top: 8px;
+  transition: all var(--transition-base);
 }
-button:hover { background-color: #45a049; }
-button:disabled { background-color: #a5d6a7; cursor: not-allowed; }
-.error { color: #e53935; font-size: 0.9rem; margin: 8px 0; }
-.alt-link { text-align: center; margin-top: 16px; color: #666; }
-.alt-link a { color: #4CAF50; text-decoration: none; }
+button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.error { color: #ef4444; font-size: 0.9rem; margin: 8px 0; }
+.alt-link { text-align: center; margin-top: 16px; color: var(--text-muted); transition: color var(--transition-slow); }
+.alt-link a { color: #22c55e; text-decoration: none; font-weight: 600; }
 </style>

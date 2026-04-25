@@ -180,49 +180,54 @@ export default {
 </script>
 
 <style scoped>
-.tracker-page { max-width: 800px; margin: 0 auto; padding: 32px 20px; font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+.tracker-page { max-width: 800px; margin: 0 auto; padding: 32px 20px; font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg-body); min-height: 100vh; transition: background var(--transition-slow); }
 .tracker-container { display: flex; flex-direction: column; gap: 20px; }
 .page-header { margin-bottom: 4px; }
-.page-header h1 { margin: 0; font-size: 1.5rem; color: #1a1a2e; }
-.subtitle { margin: 4px 0 0 0; color: #888; font-size: 0.9rem; }
+.page-header h1 { margin: 0; font-size: 1.5rem; color: var(--text-primary); transition: color var(--transition-slow); }
+.subtitle { margin: 4px 0 0 0; color: var(--text-muted); font-size: 0.9rem; transition: color var(--transition-slow); }
 
 .card {
-  background: white;
-  border-radius: 14px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   padding: 24px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-slow);
 }
-.card h3 { margin: 0 0 16px 0; font-size: 1rem; color: #333; }
+.card:hover { box-shadow: var(--shadow-md); }
+.card h3 { margin: 0 0 16px 0; font-size: 1rem; color: var(--text-primary); transition: color var(--transition-slow); }
 
 .form-row { display: flex; gap: 14px; margin-bottom: 14px; }
 .form-row .form-group { flex: 1; }
 .form-row .form-group.small { flex: 0.4; }
-.form-group label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: #666; font-weight: 500; }
+.form-group label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; transition: color var(--transition-slow); }
 .form-group input, .form-group select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 0.95rem;
   box-sizing: border-box;
-  background: #fafafa;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  transition: all var(--transition-base);
 }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: #4CAF50; background: white; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15); background: var(--bg-input); }
 
 .submit-btn {
   width: 100%;
   padding: 12px;
-  background: #4CAF50;
-  color: white;
+  background: var(--text-primary);
+  color: var(--bg-card);
   border: none;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   margin-top: 4px;
+  transition: all var(--transition-base);
 }
-.submit-btn:hover { background: #45a049; }
-.submit-btn:disabled { background: #a5d6a7; cursor: not-allowed; }
+.submit-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .summary-bar {
   display: grid;
@@ -230,23 +235,25 @@ export default {
   gap: 14px;
 }
 .summary-item {
-  background: white;
+  background: var(--bg-card);
   border-radius: 14px;
   padding: 18px;
   text-align: center;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-slow);
 }
-.summary-value { display: block; font-size: 1.4rem; font-weight: 700; color: #1a1a2e; }
-.summary-label { font-size: 0.75rem; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+.summary-value { display: block; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); transition: color var(--transition-slow); }
+.summary-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; transition: color var(--transition-slow); }
 
-.meals-section h3 { margin: 8px 0 14px 0; font-size: 1rem; color: #333; }
+.meals-section h3 { margin: 8px 0 14px 0; font-size: 1rem; color: var(--text-primary); transition: color var(--transition-slow); }
 .meals-grid { display: flex; flex-direction: column; gap: 12px; }
 .meal-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 18px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  border-left: 4px solid #ccc;
+  box-shadow: var(--shadow-sm);
+  border-left: 4px solid var(--border-color);
+  transition: all var(--transition-slow);
 }
 .meal-card.breakfast { border-left-color: #FF9800; }
 .meal-card.lunch { border-left-color: #4CAF50; }
@@ -257,29 +264,31 @@ export default {
   font-size: 0.7rem;
   text-transform: uppercase;
   font-weight: 700;
-  color: #888;
+  color: var(--text-muted);
   letter-spacing: 0.5px;
+  transition: color var(--transition-slow);
 }
-.meal-calories { font-size: 0.85rem; font-weight: 700; color: #2e7d32; }
-.meal-name { font-size: 1rem; font-weight: 600; color: #333; margin-bottom: 8px; }
+.meal-calories { font-size: 0.85rem; font-weight: 700; color: #22c55e; }
+.meal-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; transition: color var(--transition-slow); }
 .meal-macros { display: flex; gap: 16px; }
-.meal-macros span { font-size: 0.8rem; color: #888; }
+.meal-macros span { font-size: 0.8rem; color: var(--text-muted); transition: color var(--transition-slow); }
 
-.empty-state { text-align: center; padding: 30px; color: #bbb; font-size: 0.9rem; }
+.empty-state { text-align: center; padding: 30px; color: var(--text-muted); font-size: 0.9rem; }
 
 .weight-card .weight-row { display: flex; gap: 12px; }
-.weight-card input { flex: 1; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.95rem; }
+.weight-card input { flex: 1; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.95rem; background: var(--bg-input); color: var(--text-primary); }
 .weight-card button {
   padding: 10px 20px;
-  background: #2196F3;
+  background: #3b82f6;
   color: white;
   border: none;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+  transition: all var(--transition-base);
 }
-.weight-card button:hover { background: #1976d2; }
-.weight-card button:disabled { background: #90caf9; cursor: not-allowed; }
+.weight-card button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.weight-card button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 @media (max-width: 600px) {
   .form-row { flex-direction: column; gap: 10px; }

@@ -136,48 +136,108 @@ export default {
   display: flex;
   justify-content: center;
   padding: 40px 20px;
-  background: #f5f5f5;
+  background: var(--bg-body);
   min-height: 100vh;
-  font-family: Arial, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  transition: background var(--transition-slow);
 }
 .setup-card {
-  background: white;
+  background: var(--bg-card);
   padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 600px;
+  border: 1px solid var(--border-color);
+  transition: background var(--transition-slow), border-color var(--transition-slow), box-shadow var(--transition-slow);
+  animation: cardSlideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-h2 { text-align: center; color: #333; }
-.subtitle { text-align: center; color: #777; margin-bottom: 24px; font-size: 0.9rem; }
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+h2 { text-align: center; color: var(--text-primary); margin-bottom: 4px; }
+.subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; }
 .form-row { display: flex; gap: 16px; }
 .form-row .form-group { flex: 1; }
-.form-group { margin-bottom: 14px; }
-label { display: block; margin-bottom: 4px; color: #555; font-size: 0.9rem; }
+.form-group { margin-bottom: 16px; }
+label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; }
 input, select {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   font-size: 1rem;
   box-sizing: border-box;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  transition: all var(--transition-base);
 }
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15);
+  transform: translateY(-1px);
+}
+input::placeholder { color: var(--text-muted); }
 button {
   width: 100%;
-  padding: 12px;
-  background-color: #4CAF50;
-  color: white;
+  padding: 14px;
+  background: var(--accent);
+  color: #1e293b;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 8px;
+  margin-top: 12px;
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
 }
-button:hover { background-color: #45a049; }
-button:disabled { background-color: #a5d6a7; cursor: not-allowed; }
-.error { color: #e53935; font-size: 0.9rem; margin: 8px 0; }
-.success { color: #2e7d32; font-size: 0.9rem; margin: 12px 0; background: #e8f5e9; padding: 12px; border-radius: 6px; }
-.checkbox-group { display: flex; flex-direction: column; gap: 8px; }
-.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; color: #444; cursor: pointer; }
-.checkbox-label input[type="checkbox"] { width: auto; }
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(163, 230, 53, 0.3);
+}
+button:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+button:disabled { background: var(--border-color); color: var(--text-muted); cursor: not-allowed; }
+.error { color: #ef4444; font-size: 0.9rem; margin: 10px 0; }
+.success {
+  color: #22c55e;
+  font-size: 0.9rem;
+  margin: 14px 0;
+  background: rgba(34, 197, 94, 0.1);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  animation: successPop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes successPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.checkbox-label:hover { background: var(--bg-hover); }
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .setup-card { padding: 24px; }
+  .form-row { flex-direction: column; gap: 0; }
+}
 </style>

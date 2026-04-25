@@ -67,16 +67,16 @@ header {
   padding: 16px 0;
   border-bottom: 1px solid #eee;
 }
-h1 { color: #2e7d32; margin: 0; }
+h1 { color: #22c55e; margin: 0; }
 nav { display: flex; gap: 16px; }
-nav a { color: #555; text-decoration: none; font-size: 0.95rem; }
-nav a:hover { color: #2e7d32; }
+nav a { color: var(--text-secondary); text-decoration: none; font-size: 0.95rem; transition: color var(--transition-base); }
+nav a:hover { color: #22c55e; }
 .hero {
   text-align: center;
   padding: 50px 20px;
 }
-.hero h2 { color: #333; margin-bottom: 12px; }
-.hero > p { color: #666; max-width: 500px; margin: 0 auto 30px; }
+.hero h2 { color: var(--text-primary); margin-bottom: 12px; transition: color var(--transition-slow); }
+.hero > p { color: var(--text-secondary); max-width: 500px; margin: 0 auto 30px; transition: color var(--transition-slow); }
 .features {
   display: flex;
   gap: 20px;
@@ -88,25 +88,27 @@ nav a:hover { color: #2e7d32; }
   flex: 1;
   min-width: 200px;
   max-width: 260px;
-  background: white;
+  background: var(--bg-card);
   padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-slow);
 }
-.feature h3 { color: #2e7d32; margin: 0 0 8px 0; font-size: 1rem; }
-.feature p { color: #666; font-size: 0.85rem; margin: 0; }
+.feature:hover { box-shadow: var(--shadow-md); transform: translateY(-3px); }
+.feature h3 { color: #22c55e; margin: 0 0 8px 0; font-size: 1rem; }
+.feature p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; transition: color var(--transition-slow); }
 .cta-btn {
   display: inline-block;
   padding: 14px 36px;
-  background-color: #4CAF50;
-  color: white;
-  border-radius: 8px;
+  background: var(--text-primary);
+  color: var(--bg-card);
+  border-radius: var(--radius-sm);
   text-decoration: none;
   font-size: 1.1rem;
   font-weight: bold;
-  transition: background 0.2s;
+  transition: all var(--transition-base);
 }
-.cta-btn:hover { background-color: #45a049; }
+.cta-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 @media (max-width: 600px) {
   .landing-page { padding: 10px; }
   .hero { padding: 30px 10px; }
