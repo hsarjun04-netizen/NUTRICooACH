@@ -13,7 +13,20 @@
           <div class="form-row">
             <div class="form-group">
               <label>Meal Name</label>
-              <input v-model="mealForm.name" type="text" placeholder="e.g., Grilled Chicken Salad" required />
+              <input 
+                v-model="mealForm.name" 
+                type="text" 
+                placeholder="e.g., Grilled Chicken Salad" 
+                required 
+                @input="autoFillNutrition"
+                list="food-suggestions"
+              />
+              <datalist id="food-suggestions">
+                <option v-for="food in foodSuggestions" :key="food.name" :value="food.name"></option>
+              </datalist>
+              <div v-if="showAutoFillBadge" class="auto-fill-badge">
+                <span class="badge-icon">&#10003;</span> Auto-filled
+              </div>
             </div>
             <div class="form-group small">
               <label>Type</label>
@@ -24,23 +37,27 @@
                 <option value="snack">Snack</option>
               </select>
             </div>
+            <div class="form-group small">
+              <label>Servings</label>
+              <input v-model.number="mealForm.servings" type="number" placeholder="1" min="0.5" step="0.5" @input="autoFillNutrition" />
+            </div>
           </div>
           <div class="form-row macros">
             <div class="form-group">
               <label>Calories</label>
-              <input v-model.number="mealForm.calories" type="number" placeholder="0" min="0" />
+              <input v-model.number="mealForm.calories" type="number" placeholder="Auto" min="0" :class="{ 'auto-filled': showAutoFillBadge }" />
             </div>
             <div class="form-group">
               <label>Protein (g)</label>
-              <input v-model.number="mealForm.protein" type="number" placeholder="0" min="0" />
+              <input v-model.number="mealForm.protein" type="number" placeholder="Auto" min="0" :class="{ 'auto-filled': showAutoFillBadge }" />
             </div>
             <div class="form-group">
               <label>Carbs (g)</label>
-              <input v-model.number="mealForm.carbs" type="number" placeholder="0" min="0" />
+              <input v-model.number="mealForm.carbs" type="number" placeholder="Auto" min="0" :class="{ 'auto-filled': showAutoFillBadge }" />
             </div>
             <div class="form-group">
               <label>Fats (g)</label>
-              <input v-model.number="mealForm.fats" type="number" placeholder="0" min="0" />
+              <input v-model.number="mealForm.fats" type="number" placeholder="Auto" min="0" :class="{ 'auto-filled': showAutoFillBadge }" />
             </div>
           </div>
           <button type="submit" :disabled="saving" class="submit-btn">{{ saving ? 'Saving...' : 'Log Meal' }}</button>
@@ -73,10 +90,14 @@
         <div v-if="meals.length" class="meals-grid">
           <div v-for="meal in meals" :key="meal.id" class="meal-card" :class="meal.meal_type">
             <div class="meal-header">
-              <span class="meal-type-badge">{{ meal.meal_type }}</span>
+              <span class="meal-type-badge">{{ capitalize(meal.meal_type) }}</span>
               <span class="meal-calories">{{ meal.calories }} kcal</span>
             </div>
             <div class="meal-name">{{ meal.name }}</div>
+            <div v-if="meal.servings" class="meal-servings">
+              <span class="servings-icon">&#127860;</span>
+              <span class="servings-text">{{ meal.servings }} serving{{ meal.servings > 1 ? 's' : '' }}</span>
+            </div>
             <div class="meal-macros">
               <span>P: {{ meal.protein || 0 }}g</span>
               <span>C: {{ meal.carbs || 0 }}g</span>
@@ -116,11 +137,74 @@ export default {
         protein: null,
         carbs: null,
         fats: null,
-        meal_type: 'breakfast'
+        meal_type: 'breakfast',
+        servings: 1
       },
       weightForm: { weight: null },
       saving: false,
-      savingWeight: false
+      savingWeight: false,
+      showAutoFillBadge: false,
+      foodDatabase: [
+        // Breakfast items
+        { name: 'Oatmeal with Berries', calories: 350, protein: 12, carbs: 58, fats: 8 },
+        { name: 'Vegetable Omelette', calories: 280, protein: 18, carbs: 8, fats: 20 },
+        { name: 'Greek Yogurt Parfait', calories: 320, protein: 20, carbs: 45, fats: 8 },
+        { name: 'Chicken Breakfast Burrito', calories: 450, protein: 35, carbs: 42, fats: 15 },
+        { name: 'Smoothie Bowl', calories: 380, protein: 15, carbs: 62, fats: 10 },
+        { name: 'Pancakes', calories: 350, protein: 8, carbs: 52, fats: 12 },
+        { name: 'Scrambled Eggs', calories: 220, protein: 14, carbs: 2, fats: 18 },
+        { name: 'Toast with Butter', calories: 180, protein: 4, carbs: 22, fats: 9 },
+        { name: 'Cereal with Milk', calories: 250, protein: 8, carbs: 45, fats: 5 },
+        { name: 'Bagel with Cream Cheese', calories: 330, protein: 10, carbs: 48, fats: 11 },
+        
+        // Lunch items
+        { name: 'Grilled Chicken Salad', calories: 420, protein: 35, carbs: 18, fats: 22 },
+        { name: 'Quinoa Buddha Bowl', calories: 480, protein: 18, carbs: 65, fats: 16 },
+        { name: 'Turkey Wrap', calories: 380, protein: 28, carbs: 42, fats: 12 },
+        { name: 'Paneer Tikka Masala', calories: 520, protein: 25, carbs: 35, fats: 30 },
+        { name: 'Salmon Rice Bowl', calories: 550, protein: 40, carbs: 55, fats: 18 },
+        { name: 'Chicken Sandwich', calories: 450, protein: 30, carbs: 45, fats: 16 },
+        { name: 'Caesar Salad', calories: 320, protein: 22, carbs: 15, fats: 20 },
+        { name: 'Pasta with Marinara', calories: 480, protein: 16, carbs: 72, fats: 14 },
+        { name: 'Veggie Burger', calories: 390, protein: 18, carbs: 48, fats: 15 },
+        { name: 'Chicken Soup', calories: 280, protein: 24, carbs: 28, fats: 8 },
+        
+        // Dinner items
+        { name: 'Grilled Chicken with Vegetables', calories: 450, protein: 42, carbs: 28, fats: 18 },
+        { name: 'Vegetable Stir Fry with Tofu', calories: 380, protein: 22, carbs: 35, fats: 16 },
+        { name: 'Fish Curry with Rice', calories: 520, protein: 38, carbs: 48, fats: 20 },
+        { name: 'Lentil Dal with Roti', calories: 420, protein: 20, carbs: 68, fats: 8 },
+        { name: 'Egg Fried Rice', calories: 450, protein: 18, carbs: 62, fats: 14 },
+        { name: 'Steak with Potatoes', calories: 620, protein: 45, carbs: 42, fats: 28 },
+        { name: 'Spaghetti Bolognese', calories: 550, protein: 28, carbs: 68, fats: 18 },
+        { name: 'Grilled Fish with Salad', calories: 380, protein: 36, carbs: 12, fats: 20 },
+        { name: 'Chicken Curry with Rice', calories: 580, protein: 35, carbs: 65, fats: 22 },
+        { name: 'Tacos', calories: 460, protein: 26, carbs: 42, fats: 20 },
+        
+        // Snacks
+        { name: 'Trail Mix', calories: 250, protein: 8, carbs: 28, fats: 14 },
+        { name: 'Hummus with Vegetables', calories: 180, protein: 6, carbs: 22, fats: 8 },
+        { name: 'Protein Energy Balls', calories: 150, protein: 10, carbs: 18, fats: 6 },
+        { name: 'Fruit Smoothie', calories: 220, protein: 12, carbs: 38, fats: 3 },
+        { name: 'Roasted Chickpeas', calories: 180, protein: 10, carbs: 28, fats: 4 },
+        { name: 'Apple with Peanut Butter', calories: 200, protein: 6, carbs: 24, fats: 10 },
+        { name: 'Granola Bar', calories: 190, protein: 5, carbs: 28, fats: 7 },
+        { name: 'Cheese and Crackers', calories: 220, protein: 8, carbs: 20, fats: 12 },
+        { name: 'Mixed Nuts', calories: 210, protein: 7, carbs: 9, fats: 18 },
+        { name: 'Banana', calories: 105, protein: 1, carbs: 27, fats: 0 },
+        
+        // Common items
+        { name: 'Chicken Breast', calories: 165, protein: 31, carbs: 0, fats: 3.6 },
+        { name: 'Brown Rice', calories: 216, protein: 5, carbs: 45, fats: 1.8 },
+        { name: 'Broccoli', calories: 55, protein: 3.7, carbs: 11, fats: 0.6 },
+        { name: 'Sweet Potato', calories: 103, protein: 2.3, carbs: 24, fats: 0.1 },
+        { name: 'Salmon', calories: 208, protein: 20, carbs: 0, fats: 13 },
+        { name: 'Egg', calories: 78, protein: 6, carbs: 0.6, fats: 5 },
+        { name: 'Avocado', calories: 160, protein: 2, carbs: 9, fats: 15 },
+        { name: 'Almonds', calories: 164, protein: 6, carbs: 6, fats: 14 },
+        { name: 'Banana', calories: 105, protein: 1.3, carbs: 27, fats: 0.4 },
+        { name: 'Apple', calories: 95, protein: 0.5, carbs: 25, fats: 0.3 }
+      ]
     }
   },
   computed: {
@@ -135,12 +219,49 @@ export default {
     },
     todayFats() {
       return this.meals.reduce((sum, m) => sum + (m.fats || 0), 0)
+    },
+    foodSuggestions() {
+      if (!this.mealForm.name || this.mealForm.name.length < 2) {
+        return this.foodDatabase
+      }
+      const search = this.mealForm.name.toLowerCase()
+      return this.foodDatabase.filter(food => 
+        food.name.toLowerCase().includes(search)
+      ).slice(0, 10)
     }
   },
   mounted() {
     this.loadMeals()
   },
   methods: {
+    capitalize(type) {
+      return type ? type.charAt(0).toUpperCase() + type.slice(1) : ''
+    },
+    autoFillNutrition() {
+      if (!this.mealForm.name || this.mealForm.name.length < 2) {
+        return
+      }
+      
+      const search = this.mealForm.name.toLowerCase()
+      const matchedFood = this.foodDatabase.find(food => 
+        food.name.toLowerCase() === search || 
+        food.name.toLowerCase().includes(search)
+      )
+      
+      if (matchedFood) {
+        const servings = this.mealForm.servings || 1
+        this.mealForm.calories = Math.round(matchedFood.calories * servings)
+        this.mealForm.protein = Math.round(matchedFood.protein * servings * 10) / 10
+        this.mealForm.carbs = Math.round(matchedFood.carbs * servings * 10) / 10
+        this.mealForm.fats = Math.round(matchedFood.fats * servings * 10) / 10
+        
+        // Show auto-fill badge
+        this.showAutoFillBadge = true
+        setTimeout(() => {
+          this.showAutoFillBadge = false
+        }, 2000)
+      }
+    },
     async loadMeals() {
       try {
         const res = await api.get('/meals/today')
@@ -153,7 +274,7 @@ export default {
       this.saving = true
       try {
         await api.post('/meals/log', this.mealForm)
-        this.mealForm = { name: '', calories: null, protein: null, carbs: null, fats: null, meal_type: 'breakfast' }
+        this.mealForm = { name: '', calories: null, protein: null, carbs: null, fats: null, meal_type: 'breakfast', servings: 1 }
         await this.loadMeals()
       } catch (e) {
         console.error('Failed to log meal:', e)
@@ -199,6 +320,7 @@ export default {
 .form-row { display: flex; gap: 14px; margin-bottom: 14px; }
 .form-row .form-group { flex: 1; }
 .form-row .form-group.small { flex: 0.4; }
+.form-group { position: relative; }
 .form-group label { display: block; margin-bottom: 5px; font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; transition: color var(--transition-slow); }
 .form-group input, .form-group select {
   width: 100%;
@@ -212,6 +334,44 @@ export default {
   transition: all var(--transition-base);
 }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(163, 230, 53, 0.15); background: var(--bg-input); }
+.form-group input.auto-filled {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-color: #10b981;
+  font-weight: 600;
+  color: #059669;
+}
+
+.auto-fill-badge {
+  position: absolute;
+  right: 10px;
+  top: 35px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.badge-icon {
+  font-size: 12px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
 .submit-btn {
   width: 100%;
@@ -270,6 +430,22 @@ export default {
 }
 .meal-calories { font-size: 0.85rem; font-weight: 700; color: #22c55e; }
 .meal-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; transition: color var(--transition-slow); }
+.meal-servings {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-radius: 6px;
+  width: fit-content;
+}
+.servings-icon { font-size: 16px; }
+.servings-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0369a1;
+}
 .meal-macros { display: flex; gap: 16px; }
 .meal-macros span { font-size: 0.8rem; color: var(--text-muted); transition: color var(--transition-slow); }
 

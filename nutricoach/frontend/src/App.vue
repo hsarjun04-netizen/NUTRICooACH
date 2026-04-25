@@ -18,14 +18,19 @@
         <component :is="Component" />
       </transition>
     </router-view>
+    <Toast ref="toastComponent" />
   </div>
 </template>
 
 <script>
 import { useThemeStore } from './stores/theme.js'
+import Toast from './components/Toast.vue'
 
 export default {
   name: 'App',
+  components: {
+    Toast
+  },
   setup() {
     const theme = useThemeStore()
     return { theme }
@@ -42,6 +47,21 @@ export default {
       } else {
         this.$router.push('/')
       }
+    },
+    // Global toast methods
+    showToast(type, message, title, duration) {
+      if (this.$refs.toastComponent) {
+        this.$refs.toastComponent[type](message, title, duration)
+      }
+    }
+  },
+  mounted() {
+    // Make toast available globally
+    window.$toast = {
+      success: (msg, title, dur) => this.showToast('success', msg, title, dur),
+      error: (msg, title, dur) => this.showToast('error', msg, title, dur),
+      warning: (msg, title, dur) => this.showToast('warning', msg, title, dur),
+      info: (msg, title, dur) => this.showToast('info', msg, title, dur)
     }
   }
 }

@@ -1,26 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LandingPage from '../components/LandingPage.vue'
-import Login from '../components/Login.vue'
-import Register from '../components/Register.vue'
-import ProfileSetup from '../components/ProfileSetup.vue'
-import Dashboard from '../components/Dashboard.vue'
-import MealPlan from '../components/MealPlan.vue'
-import FoodTracker from '../components/FoodTracker.vue'
-import Profile from '../components/Profile.vue'
-import Chat from '../components/Chat.vue'
-import Progress from '../components/Progress.vue'
 
 const routes = [
-  { path: '/', component: LandingPage },
-  { path: '/login', component: Login },
-  { path: '/register', component: Register },
-  { path: '/setup', component: ProfileSetup, meta: { requiresAuth: true } },
-  { path: '/profile', component: Profile, meta: { requiresAuth: true } },
-  { path: '/dashboard', component: Dashboard, meta: { requiresAuth: true } },
-  { path: '/meal-plan', component: MealPlan, meta: { requiresAuth: true } },
-  { path: '/tracker', component: FoodTracker, meta: { requiresAuth: true } },
-  { path: '/chat', component: Chat, meta: { requiresAuth: true } },
-  { path: '/progress', component: Progress, meta: { requiresAuth: true } }
+  { path: '/', component: () => import('../components/LandingPage.vue') },
+  { path: '/login', component: () => import('../components/Login.vue') },
+  { path: '/register', component: () => import('../components/Register.vue') },
+  { path: '/setup', component: () => import('../components/ProfileSetup.vue'), meta: { requiresAuth: true } },
+  { path: '/profile', component: () => import('../components/Profile.vue'), meta: { requiresAuth: true } },
+  { path: '/dashboard', component: () => import('../components/Dashboard.vue'), meta: { requiresAuth: true } },
+  { path: '/meal-plan', component: () => import('../components/MealPlan.vue'), meta: { requiresAuth: true } },
+  { path: '/tracker', component: () => import('../components/FoodTracker.vue'), meta: { requiresAuth: true } },
+  { path: '/recipes', component: () => import('../components/Recipes.vue'), meta: { requiresAuth: true } },
+  { path: '/shopping-list', component: () => import('../components/ShoppingList.vue'), meta: { requiresAuth: true } },
+  { path: '/exercises', component: () => import('../components/ExerciseTracker.vue'), meta: { requiresAuth: true } },
+  { path: '/progress', component: () => import('../components/Progress.vue'), meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

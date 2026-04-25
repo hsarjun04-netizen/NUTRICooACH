@@ -5,7 +5,8 @@
       <div class="sidebar-brand">.Diet</div>
       <nav class="sidebar-nav">
         <router-link v-for="item in navItems" :key="item.to" :to="item.to" class="nav-item" :class="{ active: $route.path === item.to }" :title="item.label">
-          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-icon" v-html="item.icon"></span>
+          <span class="nav-label">{{ item.label }}</span>
         </router-link>
       </nav>
       <div class="sidebar-footer">
@@ -153,6 +154,25 @@
             </div>
           </div>
 
+          <div class="form-card">
+            <div class="card-header"><span class="card-icon">&#128274;</span><h3>Change Password</h3></div>
+            <div class="form-grid">
+              <div class="form-group full">
+                <label>Current Password</label>
+                <input type="password" v-model="passwordForm.currentPassword" placeholder="Enter current password" />
+              </div>
+              <div class="form-group">
+                <label>New Password</label>
+                <input type="password" v-model="passwordForm.newPassword" placeholder="Enter new password" />
+              </div>
+              <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" v-model="passwordForm.confirmPassword" placeholder="Confirm new password" />
+              </div>
+            </div>
+            <p class="password-hint">&#128161; Password must be at least 6 characters long</p>
+          </div>
+
           <div v-if="error" class="alert alert-error">{{ error }}</div>
           <div v-if="success" class="alert alert-success">{{ success }}</div>
 
@@ -190,11 +210,18 @@ export default {
       profile: null,
       healthProfile: null,
       editForm: {},
+      passwordForm: {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      },
       navItems: [
         { to: '/dashboard', icon: '&#127968;', label: 'Dashboard' },
         { to: '/meal-plan', icon: '&#128197;', label: 'Meal Plan' },
         { to: '/tracker', icon: '&#127860;', label: 'Food Tracker' },
-        { to: '/chat', icon: '&#128172;', label: 'AI Coach' },
+        { to: '/recipes', icon: '&#127859;', label: 'Recipes' },
+        { to: '/shopping-list', icon: '&#128221;', label: 'Shopping List' },
+        { to: '/exercises', icon: '&#127939;', label: 'Exercise Tracker' },
         { to: '/progress', icon: '&#128200;', label: 'Progress' },
         { to: '/profile', icon: '&#9881;', label: 'Profile' }
       ]
@@ -264,17 +291,46 @@ export default {
       this.editing = true
       this.error = ''
       this.success = ''
-    },
-    cancelEdit() {
-      this.editing = false
-      this.error = ''
-      this.success = ''
+      this.resetPasswordForm()
     },
     async saveProfile() {
       this.saving = true
       this.error = ''
       this.success = ''
+      
       try {
+        // Validate password if any password field is filled
+        if (this.passwordForm.currentPassword || this.passwordForm.newPassword || this.passwordForm.confirmPassword) {
+          // Check if all password fields are filled
+          if (!this.passwordForm.currentPassword || !this.passwordForm.newPassword || !this.passwordForm.confirmPassword) {
+            this.error = 'Please fill in all password fields'
+            this.saving = false
+            return
+          }
+          
+          // Check password length
+          if (this.passwordForm.newPassword.length < 6) {
+            this.error = 'New password must be at least 6 characters long'
+            this.saving = false
+            return
+          }
+          
+          // Check if passwords match
+          if (this.passwordForm.newPassword !== this.passwordForm.confirmPassword) {
+            this.error = 'New passwords do not match'
+            this.saving = false
+            return
+          }
+          
+          // Check if new password is same as current
+          if (this.passwordForm.currentPassword === this.passwordForm.newPassword) {
+            this.error = 'New password must be different from current password'
+            this.saving = false
+            return
+          }
+        }
+        
+        // Save profile changes
         const userStore = useUserStore()
         await userStore.updateProfile(this.editForm)
         this.profile = { ...this.profile, ...this.editForm }
@@ -287,8 +343,18 @@ export default {
           this.healthProfile = await userStore.calculateHealth()
           this.success += ' Health metrics recalculated.'
         }
+        
+        // Change password if provided
+        if (this.passwordForm.currentPassword && this.passwordForm.newPassword) {
+          await this.changePassword()
+          this.success += ' Password updated.'
+        }
 
-        setTimeout(() => { this.editing = false; this.success = '' }, 1500)
+        setTimeout(() => { 
+          this.editing = false
+          this.success = ''
+          this.resetPasswordForm()
+        }, 2000)
       } catch (e) {
         this.error = e.response?.data?.error || 'Failed to save profile'
       } finally {
@@ -306,6 +372,27 @@ export default {
       const auth = useAuthStore()
       auth.logout()
       this.$router.push('/login')
+    },
+    async changePassword() {
+      const api = (await import('../src/api')).default
+      const response = await api.put('/users/change-password', {
+        current_password: this.passwordForm.currentPassword,
+        new_password: this.passwordForm.newPassword
+      })
+      return response.data
+    },
+    resetPasswordForm() {
+      this.passwordForm = {
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }
+    },
+    cancelEdit() {
+      this.editing = false
+      this.error = ''
+      this.success = ''
+      this.resetPasswordForm()
     }
   }
 }
@@ -317,8 +404,8 @@ export default {
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-  width: 64px; background: var(--bg-sidebar);
-  display: flex; flex-direction: column; align-items: center;
+  width: 200px; background: var(--bg-sidebar);
+  display: flex; flex-direction: column; align-items: stretch;
   padding: 20px 0; flex-shrink: 0;
   border-radius: 0 20px 20px 0; margin: 12px 0 12px 0;
   transition: background var(--transition-slow);
@@ -327,18 +414,21 @@ export default {
 .sidebar-nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .sidebar-footer { margin-top: auto; padding-top: 16px; }
 .nav-item {
-  width: 44px; height: 44px;
-  display: flex; align-items: center; justify-content: center;
+  height: 44px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px;
   border-radius: 12px; color: var(--text-muted);
-  text-decoration: none; font-size: 1.2rem;
+  text-decoration: none; font-size: 0.9rem;
   transition: all var(--transition-base);
   position: relative;
+  margin: 0 8px;
 }
 .nav-item::before { content: ''; position: absolute; inset: 0; border-radius: 12px; background: var(--accent); opacity: 0; transform: scale(0.8); transition: all var(--transition-base); z-index: 0; }
 .nav-item:hover, .nav-item.active { color: #1e293b; transform: scale(1.1); }
 .nav-item:hover::before, .nav-item.active::before { opacity: 1; transform: scale(1); }
 .nav-item:hover { box-shadow: 0 0 16px rgba(163, 230, 53, 0.4); }
-.nav-icon { position: relative; z-index: 1; }
+.nav-icon { position: relative; z-index: 1; font-size: 1.2rem; }
+.nav-label { position: relative; z-index: 1; font-weight: 500; }
 
 /* ===== MAIN ===== */
 .main-content { flex: 1; padding: 32px; max-width: 900px; }
@@ -449,6 +539,14 @@ export default {
   outline: none;
 }
 .form-actions { display: flex; justify-content: flex-end; }
+
+.password-hint {
+  margin: 10px 0 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+  transition: color var(--transition-slow);
+}
 
 /* ===== ALERTS ===== */
 .alert { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500; animation: fadeInUp 0.3s ease-out; }

@@ -1,10 +1,18 @@
 <template>
   <div class="meal-plan-page">
     <header class="page-header">
-      <h2>Your Meal Plan</h2>
-      <button @click="generateNewPlan" :disabled="generating">
-        {{ generating ? 'Generating...' : 'Generate New Plan' }}
-      </button>
+      <h2>&#128197; Your Meal Plan</h2>
+      <div class="header-actions">
+        <button class="btn-export" @click="exportCSV" :disabled="!plan || !plan.meals.length">
+          &#128229; Export CSV
+        </button>
+        <button class="btn-export" @click="exportJSON" :disabled="!plan || !plan.meals.length">
+          &#128229; Export JSON
+        </button>
+        <button @click="generateNewPlan" :disabled="generating">
+          {{ generating ? 'Generating...' : '&#10024; Generate New Plan' }}
+        </button>
+      </div>
     </header>
 
     <div v-if="plan && plan.meals.length" class="plan-container">
@@ -92,6 +100,60 @@ export default {
     },
     formatMealType(type) {
       return type.charAt(0).toUpperCase() + type.slice(1)
+    },
+    async exportCSV() {
+      try {
+        const response = await fetch('/api/v1/meal-plans/export/csv', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        
+        if (!response.ok) {
+          alert('No meal plan found for today')
+          return
+        }
+        
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `meal-plan-${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } catch (e) {
+        console.error('Failed to export CSV:', e)
+        alert('Failed to export meal plan')
+      }
+    },
+    async exportJSON() {
+      try {
+        const response = await fetch('/api/v1/meal-plans/export/json', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        
+        if (!response.ok) {
+          alert('No meal plan found for today')
+          return
+        }
+        
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `meal-plan-${new Date().toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } catch (e) {
+        console.error('Failed to export JSON:', e)
+        alert('Failed to export meal plan')
+      }
     }
   }
 }
@@ -112,21 +174,35 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 15px;
 }
 h2 { color: var(--text-primary); margin: 0; transition: color var(--transition-slow); }
-button {
-  padding: 10px 20px;
+.header-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.header-actions button {
+  padding: 10px 18px;
   background: var(--text-primary);
   color: var(--bg-card);
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
 }
-button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.header-actions button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.header-actions button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-export {
+  background: #667eea !important;
+  color: white !important;
+}
+.btn-export:hover {
+  background: #5568d3 !important;
+}
 .summary-bar {
   display: flex;
   gap: 16px;

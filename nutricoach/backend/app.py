@@ -1,18 +1,171 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List
 import sqlite3
 import os
 import sys
 import datetime
+import json
+import csv
+from io import StringIO
+import logging
+from logging.handlers import RotatingFileHandler
 
 sys.path.insert(0, os.path.dirname(__file__))
 from meal_engine import generate_meal_plan
+from validation import (
+    sanitize_string, sanitize_email, validate_password,
+    validate_number, validate_date, validate_exercise_data,
+    validate_meal_data, validate_user_profile, paginate_query
+)
+from backup import backup_database, list_backups, export_user_data as export_user_backup
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'nutricoach-dev-secret-key-change-in-production')
 jwt = JWTManager(app)
+
+# Rate limiting
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# ========== LOGGING CONFIGURATION ==========
+def setup_logging():
+    """Configure comprehensive logging system"""
+    # Create logs directory if it doesn't exist
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    # Configure root logger
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # File handler with rotation (10MB max, keep 5 backups)
+    file_handler = RotatingFileHandler(
+        'logs/nutricoach.log',
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
+    ))
+    file_handler.setLevel(logging.INFO)
+    
+    # Error file handler (separate file for errors)
+    error_handler = RotatingFileHandler(
+        'logs/nutricoach_errors.log',
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5
+    )
+    error_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(name)s:%(lineno)d: %(message)s'
+    ))
+    error_handler.setLevel(logging.ERROR)
+    
+    # Add handlers to app logger
+    app.logger.addHandler(file_handler)
+    app.logger.addHandler(error_handler)
+    app.logger.setLevel(logging.INFO)
+    
+    # Console handler for development
+    if app.debug:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        app.logger.addHandler(console_handler)
+    
+    app.logger.info('NutriCoach AI application starting...')
+
+setup_logging()
+
+# ========== ERROR HANDLING MIDDLEWARE ==========
+@app.errorhandler(400)
+def bad_request(error):
+    app.logger.warning(f'Bad request: {request.url} - {error.description}')
+    return jsonify({
+        'error': 'Bad Request',
+        'message': error.description or 'Invalid request'
+    }), 400
+
+@app.errorhandler(401)
+def unauthorized(error):
+    app.logger.warning(f'Unauthorized access attempt: {request.url}')
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Authentication required'
+    }), 401
+
+@app.errorhandler(403)
+def forbidden(error):
+    app.logger.warning(f'Forbidden access: {request.url}')
+    return jsonify({
+        'error': 'Forbidden',
+        'message': 'You do not have permission to access this resource'
+    }), 403
+
+@app.errorhandler(404)
+def not_found(error):
+    app.logger.warning(f'Resource not found: {request.url}')
+    return jsonify({
+        'error': 'Not Found',
+        'message': 'The requested resource was not found'
+    }), 404
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    app.logger.warning(f'Rate limit exceeded: {request.url} from {request.remote_addr}')
+    return jsonify({
+        'error': 'Rate Limit Exceeded',
+        'message': 'Too many requests. Please try again later.'
+    }), 429
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f'Internal server error: {request.url} - {str(error)}')
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': 'An unexpected error occurred. Please try again later.'
+    }), 500
+
+# Global exception handler
+@app.errorhandler(Exception)
+def handle_exception(e):
+    app.logger.error(f'Unhandled exception: {request.url} - {str(e)}', exc_info=True)
+    # Pass through HTTP errors
+    if isinstance(e, HTTPException):
+        return jsonify({
+            'error': e.name,
+            'message': e.description
+        }), e.code
+    # Non-HTTP error
+    return jsonify({
+        'error': 'Internal Server Error',
+        'message': 'An unexpected error occurred'
+    }), 500
+
+from werkzeug.exceptions import HTTPException
+
+# ========== REQUEST LOGGING MIDDLEWARE ==========
+@app.before_request
+def log_request():
+    """Log all incoming requests"""
+    app.logger.info(f'{request.method} {request.path} from {request.remote_addr}')
+
+@app.after_request
+def log_response(response):
+    """Log response status"""
+    app.logger.info(f'{request.method} {request.path} - {response.status_code}')
+    return response
 
 # Enable CORS only in development
 if os.environ.get('FLASK_ENV') != 'production':
@@ -20,30 +173,71 @@ if os.environ.get('FLASK_ENV') != 'production':
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'database.db')
 
+# ========== VALIDATION MODELS ==========
+
+class RegisterModel(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=100)
+    
+    @field_validator('name')
+    @classmethod
+    def name_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError('Name cannot be empty')
+        return v.strip()
+
+class LoginModel(BaseModel):
+    email: EmailStr
+    password: str
+
+class MealLogModel(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    calories: float = Field(default=0, ge=0)
+    protein: float = Field(default=0, ge=0)
+    carbs: float = Field(default=0, ge=0)
+    fats: float = Field(default=0, ge=0)
+    meal_type: str = Field(default='snack')
+    date: Optional[str] = None
+
+class WeightLogModel(BaseModel):
+    weight: float = Field(..., gt=0, lt=500)
+    date: Optional[str] = None
+
+class WaterLogModel(BaseModel):
+    amount_ml: int = Field(default=250, ge=1, le=5000)
+    date: Optional[str] = None
+
+# ========== HELPER FUNCTIONS ==========
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
+def sanitize_input(text: str, max_length: int = 500) -> str:
+    """Sanitize user input to prevent injection"""
+    if not text:
+        return ""
+    return text.strip()[:max_length]
+
 # ========== AUTH ==========
 
 @app.route('/api/v1/auth/register', methods=['POST'])
+@limiter.limit("10 per minute")
 def register():
-    data = request.json
-    name = data.get('name')
-    email = data.get('email')
-    password = data.get('password')
-
-    if not name or not email or not password:
-        return jsonify({'error': 'Name, email and password are required'}), 400
-
-    password_hash = generate_password_hash(password)
+    try:
+        data = RegisterModel(**request.json)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+    
+    password_hash = generate_password_hash(data.password)
     conn = get_db_connection()
     cur = conn.cursor()
 
     try:
         cur.execute('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)',
-                    (name, email, password_hash))
+                    (data.name, data.email, password_hash))
         conn.commit()
         user_id = cur.lastrowid
     except sqlite3.IntegrityError:
@@ -56,21 +250,20 @@ def register():
 
 
 @app.route('/api/v1/auth/login', methods=['POST'])
+@limiter.limit("20 per minute")
 def login():
-    data = request.json
-    email = data.get('email')
-    password = data.get('password')
-
-    if not email or not password:
-        return jsonify({'error': 'Email and password are required'}), 400
+    try:
+        data = LoginModel(**request.json)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT id, password_hash, name FROM users WHERE email = ?', (email,))
+    cur.execute('SELECT id, password_hash, name FROM users WHERE email = ?', (data.email,))
     user = cur.fetchone()
     conn.close()
 
-    if not user or not check_password_hash(user['password_hash'], password):
+    if not user or not check_password_hash(user['password_hash'], data.password):
         return jsonify({'error': 'Invalid credentials'}), 401
 
     token = create_access_token(identity=str(user['id']))
@@ -103,7 +296,7 @@ def update_profile():
 
     fields = ['name', 'age', 'gender', 'height', 'weight', 'goals',
               'activity_level', 'diet_type', 'allergies', 'medical_conditions', 'budget']
-    updates = {k: data.get(k) for k in fields if k in data}
+    updates = {k: sanitize_input(str(data.get(k)), 1000) for k in fields if k in data}
 
     if not updates:
         return jsonify({'error': 'No fields to update'}), 400
@@ -136,6 +329,42 @@ def get_profile():
     return jsonify({key: user[key] for key in user.keys()})
 
 
+@app.route('/api/v1/users/change-password', methods=['PUT'])
+@jwt_required()
+@limiter.limit("10 per minute")
+def change_password():
+    user_id = get_jwt_identity()
+    data = request.json
+    
+    if not data.get('current_password') or not data.get('new_password'):
+        return jsonify({'error': 'Current password and new password are required'}), 400
+    
+    if len(data['new_password']) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT password_hash FROM users WHERE id = ?', (user_id,))
+    user = cur.fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Verify current password
+    if not check_password_hash(user['password_hash'], data['current_password']):
+        conn.close()
+        return jsonify({'error': 'Current password is incorrect'}), 401
+    
+    # Update to new password
+    new_password_hash = generate_password_hash(data['new_password'])
+    cur.execute('UPDATE users SET password_hash = ? WHERE id = ?', (new_password_hash, user_id))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Password updated successfully'})
+
+
 @app.route('/api/v1/users/export', methods=['GET'])
 @jwt_required()
 def export_user_data():
@@ -143,7 +372,6 @@ def export_user_data():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # User profile
     cur.execute('SELECT id, name, email, age, gender, height, weight, goals, activity_level, diet_type, allergies, medical_conditions, budget, created_at FROM users WHERE id = ?', (user_id,))
     user = cur.fetchone()
     if not user:
@@ -151,12 +379,10 @@ def export_user_data():
         return jsonify({'error': 'User not found'}), 404
     profile = {key: user[key] for key in user.keys()}
 
-    # Health profile
     cur.execute('SELECT bmi, bmr, tdee, daily_calories, target_calories, created_at, updated_at FROM health_profiles WHERE user_id = ?', (user_id,))
     health = cur.fetchone()
     health_profile = {key: health[key] for key in health.keys()} if health else None
 
-    # Meal plans with meals
     cur.execute('SELECT id, date, total_calories, created_at FROM meal_plans WHERE user_id = ? ORDER BY date DESC', (user_id,))
     meal_plans = []
     for plan_row in cur.fetchall():
@@ -165,11 +391,9 @@ def export_user_data():
         plan['meals'] = [{key: m[key] for key in m.keys()} for m in cur.fetchall()]
         meal_plans.append(plan)
 
-    # Weight logs
     cur.execute('SELECT weight, date, created_at FROM weight_logs WHERE user_id = ? ORDER BY date DESC', (user_id,))
     weight_logs = [{key: w[key] for key in w.keys()} for w in cur.fetchall()]
 
-    # Logged meals (independent)
     cur.execute('SELECT name, calories, protein, carbs, fats, date, meal_type, is_logged, created_at FROM meals WHERE user_id = ? AND is_logged = 1 ORDER BY date DESC', (user_id,))
     logged_meals = [{key: m[key] for key in m.keys()} for m in cur.fetchall()]
 
@@ -209,18 +433,15 @@ def calculate_health():
     goal = (user['goals'] or '').lower()
     activity_level = (user['activity_level'] or 'sedentary').lower()
 
-    # BMI
     height_m = height_cm / 100
     bmi = round(weight_kg / (height_m ** 2), 1)
 
-    # BMR (Mifflin-St Jeor)
     if gender == 'female':
         bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
     else:
         bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
     bmr = round(bmr, 0)
 
-    # TDEE multipliers
     multipliers = {
         'sedentary': 1.2,
         'lightly active': 1.375,
@@ -230,7 +451,6 @@ def calculate_health():
     }
     tdee = round(bmr * multipliers.get(activity_level, 1.2), 0)
 
-    # Target calories based on goal
     if 'loss' in goal:
         target_calories = tdee - 500
     elif 'gain' in goal:
@@ -240,7 +460,6 @@ def calculate_health():
 
     target_calories = round(target_calories, 0)
 
-    # Save to health_profiles
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT id FROM health_profiles WHERE user_id = ?', (user_id,))
@@ -315,7 +534,6 @@ def generate_plan():
 
     plan = generate_meal_plan(target_calories, diet_type, allergies, goal, medical_conditions, age, gender)
 
-    # Save plan to database
     conn = get_db_connection()
     cur = conn.cursor()
     today = datetime.date.today().isoformat()
@@ -367,27 +585,22 @@ def get_current_plan():
 
 @app.route('/api/v1/meals/log', methods=['POST'])
 @jwt_required()
+@limiter.limit("30 per minute")
 def log_meal():
+    try:
+        data = MealLogModel(**request.json)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
     user_id = get_jwt_identity()
-    data = request.json
-
-    name = data.get('name')
-    calories = data.get('calories', 0)
-    protein = data.get('protein', 0)
-    carbs = data.get('carbs', 0)
-    fats = data.get('fats', 0)
-    meal_type = data.get('meal_type', 'snack')
-    date = data.get('date', datetime.date.today().isoformat())
-
-    if not name:
-        return jsonify({'error': 'Meal name is required'}), 400
+    date = data.date or datetime.date.today().isoformat()
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('''
         INSERT INTO meals (user_id, name, calories, protein, carbs, fats, date, meal_type, is_logged)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-    ''', (user_id, name, calories, protein, carbs, fats, date, meal_type))
+    ''', (user_id, data.name, data.calories, data.protein, data.carbs, data.fats, date, data.meal_type))
     conn.commit()
     meal_id = cur.lastrowid
     conn.close()
@@ -416,20 +629,20 @@ def get_today_meals():
 
 @app.route('/api/v1/weight/log', methods=['POST'])
 @jwt_required()
+@limiter.limit("20 per minute")
 def log_weight():
+    try:
+        data = WeightLogModel(**request.json)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
     user_id = get_jwt_identity()
-    data = request.json
-    weight = data.get('weight')
-
-    if weight is None:
-        return jsonify({'error': 'Weight is required'}), 400
-
-    date = data.get('date', datetime.date.today().isoformat())
+    date = data.date or datetime.date.today().isoformat()
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('INSERT INTO weight_logs (user_id, weight, date) VALUES (?, ?, ?)',
-                (user_id, weight, date))
+                (user_id, data.weight, date))
     conn.commit()
     conn.close()
 
@@ -461,27 +674,22 @@ def dashboard_summary():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # User info
     cur.execute('SELECT name, weight, goals FROM users WHERE id = ?', (user_id,))
     user = cur.fetchone()
 
-    # Health profile
     cur.execute('SELECT bmi, bmr, target_calories FROM health_profiles WHERE user_id = ?', (user_id,))
     health = cur.fetchone()
 
-    # Today's meals
     cur.execute('SELECT calories FROM meals WHERE user_id = ? AND date = ?', (user_id, today))
     meals = cur.fetchall()
     consumed = sum(m['calories'] for m in meals)
 
-    # Weight history
     cur.execute('SELECT weight, date FROM weight_logs WHERE user_id = ? ORDER BY date DESC LIMIT 1', (user_id,))
     latest_weight = cur.fetchone()
 
     cur.execute('SELECT weight FROM weight_logs WHERE user_id = ? ORDER BY date ASC LIMIT 1', (user_id,))
     start_weight = cur.fetchone()
 
-    # Water intake
     cur.execute('SELECT amount_ml FROM water_logs WHERE user_id = ? AND date = ?', (user_id, today))
     water_entries = cur.fetchall()
     water_intake = sum(w['amount_ml'] for w in water_entries)
@@ -512,16 +720,20 @@ def dashboard_summary():
 
 @app.route('/api/v1/water/log', methods=['POST'])
 @jwt_required()
+@limiter.limit("30 per minute")
 def log_water():
+    try:
+        data = WaterLogModel(**request.json)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
     user_id = get_jwt_identity()
-    data = request.json
-    amount = data.get('amount_ml', 250)
-    date = data.get('date', datetime.date.today().isoformat())
+    date = data.date or datetime.date.today().isoformat()
 
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('INSERT INTO water_logs (user_id, amount_ml, date) VALUES (?, ?, ?)',
-                (user_id, amount, date))
+                (user_id, data.amount_ml, date))
     conn.commit()
     conn.close()
     return jsonify({'message': 'Water logged'}), 201
@@ -534,133 +746,500 @@ def get_water_today():
     today = datetime.date.today().isoformat()
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT amount_ml FROM water_logs WHERE user_id = ? AND date = ?', (user_id, today))
+    cur.execute('SELECT amount_ml FROM water_logs WHERE user_id= ? AND date = ?', (user_id, today))
     entries = cur.fetchall()
     conn.close()
     total = sum(e['amount_ml'] for e in entries)
     return jsonify({'total_ml': total, 'entries': len(entries)})
 
 
-# ========== AI CHAT ==========
+# ========== RECIPES ==========
 
-def generate_chat_response(message, user_profile, health_profile):
-    msg = message.lower()
-    responses = []
-
-    # Greeting
-    if any(w in msg for w in ['hi', 'hello', 'hey', 'namaste']):
-        return f"Hello {user_profile.get('name', 'there')}! I'm your NutriCoach AI. Ask me about nutrition, meal plans, or your health goals."
-
-    # Calorie questions
-    if any(w in msg for w in ['calorie', 'calories', 'how many calories', 'kcal']):
-        if health_profile and health_profile.get('target_calories'):
-            return f"Your daily calorie target is {health_profile['target_calories']} kcal based on your BMR ({health_profile.get('bmr', 'N/A')} kcal) and activity level."
-        return "To calculate your daily calorie needs, please complete your profile with age, height, weight, gender, and activity level."
-
-    # Weight loss
-    if any(w in msg for w in ['lose weight', 'weight loss', 'fat loss', 'slimming']):
-        if health_profile:
-            deficit = health_profile.get('target_calories', 2000)
-            return f"For healthy weight loss, aim for a moderate calorie deficit. Your target is {deficit} kcal/day. Focus on high-protein, high-fiber foods and regular exercise."
-        return "For weight loss, aim for a 300-500 kcal deficit from your TDEE. Would you like a meal plan designed for weight loss?"
-
-    # Protein
-    if 'protein' in msg:
-        weight = user_profile.get('weight', 70)
-        target_protein = round(weight * 1.6, 0)
-        return f"For your weight ({weight} kg), aim for about {target_protein}g of protein daily. Good sources: eggs, chicken, lentils, paneer, and Greek yogurt."
-
-    # Water
-    if any(w in msg for w in ['water', 'hydration', 'drink']):
-        weight = user_profile.get('weight', 70)
-        rec_water = round(weight * 35, 0)
-        return f"You should drink about {rec_water}ml (around {round(rec_water/250, 1)} glasses) of water daily. Stay hydrated!"
-
-    # BMI
-    if any(w in msg for w in ['bmi', 'body mass index']):
-        if health_profile and health_profile.get('bmi'):
-            bmi = health_profile['bmi']
-            status = 'underweight' if bmi < 18.5 else 'normal' if bmi < 25 else 'overweight' if bmi < 30 else 'obese'
-            return f"Your BMI is {bmi}, which falls in the {status} range. Remember, BMI is just one indicator of health."
-        return "Complete your profile to calculate your BMI. It's based on your height and weight."
-
-    # Meal suggestions
-    if any(w in msg for w in ['what should i eat', 'meal idea', 'food suggestion', 'hungry']):
-        diet = user_profile.get('diet_type', 'balanced')
-        conditions = user_profile.get('medical_conditions', '')
-        resp = "Here are some healthy options: "
-        if 'veg' in diet:
-            resp += "Daliya with milk, moong dal khichdi, mixed vegetable sabzi with roti, or a bowl of fresh fruits."
-        else:
-            resp += "Grilled chicken breast, egg bhurji with roti, fish curry with brown rice, or a Greek yogurt parfait."
-        if conditions:
-            resp += f" I've also considered your medical conditions ({conditions}) in these suggestions."
-        return resp
-
-    # Exercise
-    if any(w in msg for w in ['exercise', 'workout', 'gym', 'cardio', 'training']):
-        return "Aim for 150 minutes of moderate exercise per week. Combine cardio (walking, jogging) with strength training 2-3 times per week for best results."
-
-    # Sleep
-    if any(w in msg for w in ['sleep', 'rest', 'recovery']):
-        return "Quality sleep is crucial for weight management. Aim for 7-9 hours per night. Poor sleep increases hunger hormones and cravings."
-
-    # Thank you
-    if any(w in msg for w in ['thank', 'thanks', 'dhanyawad']):
-        return "You're welcome! Stay healthy and feel free to ask anytime."
-
-    # Default
-    return "I'm your NutriCoach AI assistant. I can help with nutrition advice, meal suggestions, calorie calculations, and health tips based on your profile. What would you like to know?"
-
-
-@app.route('/api/v1/chat', methods=['POST'])
+@app.route('/api/v1/recipes', methods=['GET'])
 @jwt_required()
-def chat():
+def get_recipes():
     user_id = get_jwt_identity()
-    data = request.json
-    message = data.get('message', '').strip()
-    if not message:
-        return jsonify({'error': 'Message is required'}), 400
-
     conn = get_db_connection()
     cur = conn.cursor()
+    
+    diet_type = request.args.get('diet_type')
+    meal_type = request.args.get('meal_type')
+    max_calories = request.args.get('max_calories')
+    
+    query = 'SELECT * FROM recipes WHERE 1=1'
+    params = []
+    
+    if diet_type:
+        query += ' AND diet_type = ?'
+        params.append(diet_type)
+    if meal_type:
+        query += ' AND meal_type = ?'
+        params.append(meal_type)
+    if max_calories:
+        query += ' AND calories <= ?'
+        params.append(float(max_calories))
+    
+    query += ' ORDER BY name ASC'
+    cur.execute(query, params)
+    recipes = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    conn.close()
+    
+    return jsonify({'recipes': recipes})
 
-    # Store user message
-    cur.execute('INSERT INTO chat_messages (user_id, role, message) VALUES (?, ?, ?)',
-                (user_id, 'user', message))
 
-    # Get user profile
-    cur.execute('SELECT name, age, gender, height, weight, goals, activity_level, diet_type, allergies, medical_conditions FROM users WHERE id = ?', (user_id,))
-    user_profile = cur.fetchone()
-    user_profile = {k: user_profile[k] for k in user_profile.keys()} if user_profile else {}
+@app.route('/api/v1/recipes/<int:recipe_id>', methods=['GET'])
+@jwt_required()
+def get_recipe(recipe_id):
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM recipes WHERE id = ?', (recipe_id,))
+    recipe = cur.fetchone()
+    conn.close()
+    
+    if not recipe:
+        return jsonify({'error': 'Recipe not found'}), 404
+    
+    return jsonify({k: recipe[k] for k in recipe.keys()})
 
-    # Get health profile
-    cur.execute('SELECT bmi, bmr, tdee, target_calories FROM health_profiles WHERE user_id = ?', (user_id,))
-    health = cur.fetchone()
-    health_profile = {k: health[k] for k in health.keys()} if health else {}
 
-    # Generate response
-    response_text = generate_chat_response(message, user_profile, health_profile)
+@app.route('/api/v1/recipes/suggestions', methods=['GET'])
+@jwt_required()
+def get_recipe_suggestions():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('SELECT diet_type, medical_conditions FROM users WHERE id = ?', (user_id,))
+    user = cur.fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({'error': 'User not found'}), 404
+    
+    diet_type = user['diet_type'] or 'veg'
+    query = 'SELECT * FROM recipes WHERE diet_type = ? OR diet_type = "vegan" ORDER BY RANDOM() LIMIT 20'
+    cur.execute(query, (diet_type,))
+    recipes = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    conn.close()
+    
+    return jsonify({'recipes': recipes})
 
-    # Store AI response
-    cur.execute('INSERT INTO chat_messages (user_id, role, message) VALUES (?, ?, ?)',
-                (user_id, 'assistant', response_text))
 
+@app.route('/api/v1/recipes/<int:recipe_id>/favorite', methods=['POST'])
+@jwt_required()
+def toggle_recipe_favorite(recipe_id):
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT is_favorite FROM recipes WHERE id = ?', (recipe_id,))
+    recipe = cur.fetchone()
+    
+    if not recipe:
+        conn.close()
+        return jsonify({'error': 'Recipe not found'}), 404
+    
+    new_favorite = not recipe['is_favorite']
+    cur.execute('UPDATE recipes SET is_favorite = ? WHERE id = ?', (new_favorite, recipe_id))
     conn.commit()
     conn.close()
-    return jsonify({'response': response_text})
+    
+    return jsonify({'is_favorite': new_favorite})
 
 
-@app.route('/api/v1/chat/history', methods=['GET'])
+# ========== SHOPPING LIST ==========
+
+@app.route('/api/v1/shopping-list/generate', methods=['POST'])
 @jwt_required()
-def get_chat_history():
+def generate_shopping_list():
+    user_id = get_jwt_identity()
+    today = datetime.date.today().isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('SELECT id FROM meal_plans WHERE user_id = ? AND date = ?', (user_id, today))
+    plan = cur.fetchone()
+    
+    if not plan:
+        conn.close()
+        return jsonify({'error': 'No meal plan found for today'}), 404
+    
+    meal_plan_id = plan['id']
+    
+    cur.execute('DELETE FROM shopping_lists WHERE user_id = ? AND meal_plan_id = ?', (user_id, meal_plan_id))
+    
+    cur.execute('SELECT name FROM meals WHERE meal_plan_id = ?', (meal_plan_id,))
+    meals = cur.fetchall()
+    
+    ingredient_map = {
+        'chicken': {'category': 'Protein', 'unit': 'kg'},
+        'fish': {'category': 'Protein', 'unit': 'kg'},
+        'paneer': {'category': 'Dairy', 'unit': 'g'},
+        'dal': {'category': 'Grains', 'unit': 'kg'},
+        'rice': {'category': 'Grains', 'unit': 'kg'},
+        'roti': {'category': 'Grains', 'unit': 'pcs'},
+        'egg': {'category': 'Dairy', 'unit': 'pcs'},
+        'vegetable': {'category': 'Vegetables', 'unit': 'kg'},
+        'sabzi': {'category': 'Vegetables', 'unit': 'kg'},
+        'fruit': {'category': 'Fruits', 'unit': 'kg'},
+        'milk': {'category': 'Dairy', 'unit': 'L'},
+        'curd': {'category': 'Dairy', 'unit': 'g'},
+    }
+    
+    for meal in meals:
+        meal_name = meal['name'].lower()
+        for keyword, info in ingredient_map.items():
+            if keyword in meal_name:
+                cur.execute(
+                    'INSERT INTO shopping_lists (user_id, item_name, category, quantity, unit, meal_plan_id) VALUES (?, ?, ?, ?, ?, ?)',
+                    (user_id, keyword.capitalize(), info['category'], '1', info['unit'], meal_plan_id)
+                )
+                break
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Shopping list generated successfully'})
+
+
+@app.route('/api/v1/shopping-list', methods=['GET'])
+@jwt_required()
+def get_shopping_list():
     user_id = get_jwt_identity()
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT role, message, created_at FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC', (user_id,))
-    messages = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    cur.execute('SELECT * FROM shopping_lists WHERE user_id = ? ORDER BY category, item_name', (user_id,))
+    items = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
     conn.close()
-    return jsonify({'messages': messages})
+    
+    return jsonify({'items': items})
+
+
+@app.route('/api/v1/shopping-list/item/<int:item_id>', methods=['PUT'])
+@jwt_required()
+def toggle_shopping_item(item_id):
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT is_purchased FROM shopping_lists WHERE id = ? AND user_id = ?', (item_id, user_id))
+    item = cur.fetchone()
+    
+    if not item:
+        conn.close()
+        return jsonify({'error': 'Item not found'}), 404
+    
+    new_status = not item['is_purchased']
+    cur.execute('UPDATE shopping_lists SET is_purchased = ? WHERE id = ?', (new_status, item_id))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'is_purchased': new_status})
+
+
+@app.route('/api/v1/shopping-list', methods=['DELETE'])
+@jwt_required()
+def clear_shopping_list():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('DELETE FROM shopping_lists WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Shopping list cleared'})
+
+
+# ========== BODY MEASUREMENTS ==========
+
+@app.route('/api/v1/measurements/log', methods=['POST'])
+@jwt_required()
+def log_measurement():
+    user_id = get_jwt_identity()
+    data = request.json
+    date = data.get('date', datetime.date.today().isoformat())
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        'INSERT INTO body_measurements (user_id, date, body_fat, waist, hips, chest, left_arm, right_arm, left_thigh, right_thigh, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        (user_id, date, data.get('body_fat'), data.get('waist'), data.get('hips'), data.get('chest'),
+         data.get('left_arm'), data.get('right_arm'), data.get('left_thigh'), data.get('right_thigh'), data.get('notes'))
+    )
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Measurement logged successfully'}), 201
+
+
+@app.route('/api/v1/measurements/history', methods=['GET'])
+@jwt_required()
+def get_measurements_history():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM body_measurements WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    measurements = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    conn.close()
+    
+    return jsonify({'measurements': measurements})
+
+
+# ========== EXERCISE LOGS ==========
+
+# Exercise calorie database (calories per minute by intensity)
+EXERCISE_CALORIE_DB = {
+    'running': {'low': 8.0, 'moderate': 11.5, 'high': 15.0, 'very high': 18.0},
+    'walking': {'low': 3.0, 'moderate': 4.5, 'high': 6.0, 'very high': 7.5},
+    'cycling': {'low': 6.0, 'moderate': 8.5, 'high': 11.0, 'very high': 14.0},
+    'swimming': {'low': 7.0, 'moderate': 9.5, 'high': 12.0, 'very high': 15.0},
+    'weight training': {'low': 4.0, 'moderate': 6.0, 'high': 8.0, 'very high': 10.0},
+    'yoga': {'low': 2.5, 'moderate': 3.5, 'high': 4.5, 'very high': 5.5},
+    'hiit': {'low': 8.5, 'moderate': 12.0, 'high': 15.5, 'very high': 19.0},
+    'jump rope': {'low': 8.0, 'moderate': 11.0, 'high': 14.0, 'very high': 17.0},
+    'push-ups': {'low': 5.0, 'moderate': 7.0, 'high': 9.0, 'very high': 11.0},
+    'squats': {'low': 4.5, 'moderate': 6.5, 'high': 8.5, 'very high': 10.5},
+    'plank': {'low': 3.0, 'moderate': 4.0, 'high': 5.0, 'very high': 6.0},
+    'burpees': {'low': 8.5, 'moderate': 12.0, 'high': 15.5, 'very high': 19.0},
+    'lunges': {'low': 4.5, 'moderate': 6.0, 'high': 7.5, 'very high': 9.0},
+    'pull-ups': {'low': 5.5, 'moderate': 7.5, 'high': 9.5, 'very high': 11.5},
+    'dancing': {'low': 5.0, 'moderate': 7.0, 'high': 9.0, 'very high': 11.0},
+    'boxing': {'low': 7.0, 'moderate': 10.0, 'high': 13.0, 'very high': 16.0},
+    'rowing': {'low': 6.5, 'moderate': 9.0, 'high': 11.5, 'very high': 14.0},
+    'elliptical': {'low': 6.0, 'moderate': 8.0, 'high': 10.0, 'very high': 12.5},
+    'stair climbing': {'low': 7.0, 'moderate': 9.5, 'high': 12.0, 'very high': 15.0},
+    'pilates': {'low': 3.0, 'moderate': 4.5, 'high': 6.0, 'very high': 7.5},
+}
+
+def calculate_calories(exercise_name, duration_minutes, intensity='moderate'):
+    """Auto-calculate calories burned based on exercise, duration, and intensity"""
+    if not exercise_name or not duration_minutes:
+        return 0
+    
+    exercise_lower = exercise_name.lower()
+    intensity_lower = intensity.lower() if intensity else 'moderate'
+    
+    # Find matching exercise in database
+    for key, rates in EXERCISE_CALORIE_DB.items():
+        if key in exercise_lower or exercise_lower in key:
+            rate = rates.get(intensity_lower, rates.get('moderate', 7.0))
+            return round(rate * duration_minutes)
+    
+    # Default calorie rate for unknown exercises
+    default_rates = {'low': 5.0, 'moderate': 7.0, 'high': 9.0, 'very high': 11.0}
+    rate = default_rates.get(intensity_lower, 7.0)
+    return round(rate * duration_minutes)
+
+
+@app.route('/api/v1/exercise/log', methods=['POST'])
+@jwt_required()
+@limiter.limit("30 per hour")
+def log_exercise():
+    user_id = get_jwt_identity()
+    data = request.json
+    
+    # Validate input
+    errors = validate_exercise_data(data)
+    if errors:
+        app.logger.warning(f'Exercise validation failed for user {user_id}: {errors}')
+        return jsonify({'error': 'Validation failed', 'details': errors}), 400
+    
+    date = data.get('date', datetime.date.today().isoformat())
+    
+    # Auto-calculate calories if not provided or if auto-calculation is preferred
+    duration = data.get('duration_minutes')
+    intensity = data.get('intensity', 'moderate')
+    exercise_name = sanitize_string(data.get('exercise_name', ''), max_length=100)
+    notes = sanitize_string(data.get('notes', ''), max_length=500)
+    
+    # Use provided calories or auto-calculate
+    calories = data.get('calories_burned')
+    if calories is None or calories == 0:
+        calories = calculate_calories(exercise_name, duration, intensity)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        'INSERT INTO exercise_logs (user_id, date, exercise_name, duration_minutes, calories_burned, intensity, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (user_id, date, exercise_name, duration, calories, intensity, notes)
+    )
+    conn.commit()
+    conn.close()
+    
+    app.logger.info(f'Exercise logged: user={user_id}, exercise={exercise_name}, duration={duration}min, calories={calories}')
+    
+    return jsonify({
+        'message': 'Exercise logged successfully',
+        'calories_calculated': calories
+    }), 201
+
+
+@app.route('/api/v1/exercise/history', methods=['GET'])
+@jwt_required()
+def get_exercise_history():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM exercise_logs WHERE user_id = ? ORDER BY date DESC', (user_id,))
+    exercises = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    conn.close()
+    
+    return jsonify({'exercises': exercises})
+
+
+@app.route('/api/v1/exercise/today', methods=['GET'])
+@jwt_required()
+def get_today_exercise():
+    user_id = get_jwt_identity()
+    today = datetime.date.today().isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM exercise_logs WHERE user_id = ? AND date = ?', (user_id, today))
+    exercises = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
+    total_calories = sum(e['calories_burned'] or 0 for e in exercises)
+    total_duration = sum(e['duration_minutes'] or 0 for e in exercises)
+    conn.close()
+    
+    return jsonify({
+        'exercises': exercises,
+        'total_calories_burned': total_calories,
+        'total_duration_minutes': total_duration
+    })
+
+
+# ========== CUSTOM GOALS ==========
+
+@app.route('/api/v1/users/goals', methods=['PUT'])
+@jwt_required()
+def update_custom_goals():
+    user_id = get_jwt_identity()
+    data = request.json
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT id FROM custom_goals WHERE user_id = ?', (user_id,))
+    existing = cur.fetchone()
+    
+    if existing:
+        cur.execute(
+            'UPDATE custom_goals SET water_goal_ml = ?, calorie_goal = ?, protein_goal = ?, carbs_goal = ?, fats_goal = ? WHERE user_id = ?',
+            (data.get('water_goal_ml', 2500), data.get('calorie_goal'), data.get('protein_goal'),
+             data.get('carbs_goal'), data.get('fats_goal'), user_id)
+        )
+    else:
+        cur.execute(
+            'INSERT INTO custom_goals (user_id, water_goal_ml, calorie_goal, protein_goal, carbs_goal, fats_goal) VALUES (?, ?, ?, ?, ?, ?)',
+            (user_id, data.get('water_goal_ml', 2500), data.get('calorie_goal'), data.get('protein_goal'),
+             data.get('carbs_goal'), data.get('fats_goal'))
+        )
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'message': 'Goals updated successfully'})
+
+
+@app.route('/api/v1/users/goals', methods=['GET'])
+@jwt_required()
+def get_custom_goals():
+    user_id = get_jwt_identity()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM custom_goals WHERE user_id = ?', (user_id,))
+    goals = cur.fetchone()
+    conn.close()
+    
+    if not goals:
+        return jsonify({
+            'water_goal_ml': 2500,
+            'calorie_goal': None,
+            'protein_goal': None,
+            'carbs_goal': None,
+            'fats_goal': None
+        })
+    
+    return jsonify({k: goals[k] for k in goals.keys()})
+
+
+# ========== MEAL PLAN EXPORT ==========
+
+@app.route('/api/v1/meal-plans/export/csv', methods=['GET'])
+@jwt_required()
+def export_meal_plan_csv():
+    user_id = get_jwt_identity()
+    today = datetime.date.today().isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM meal_plans WHERE user_id = ? AND date = ?', (user_id, today))
+    plan = cur.fetchone()
+    
+    if not plan:
+        conn.close()
+        return jsonify({'error': 'No meal plan found for today'}), 404
+    
+    cur.execute('SELECT name, calories, protein, carbs, fats, meal_type FROM meals WHERE meal_plan_id = ? ORDER BY CASE meal_type WHEN "breakfast" THEN 1 WHEN "lunch" THEN 2 WHEN "dinner" THEN 3 WHEN "snack" THEN 4 END', (plan['id'],))
+    meals = cur.fetchall()
+    conn.close()
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Meal Type', 'Name', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fats (g)'])
+    
+    for meal in meals:
+        writer.writerow([
+            meal['meal_type'].capitalize(),
+            meal['name'],
+            round(meal['calories']),
+            round(meal['protein']),
+            round(meal['carbs']),
+            round(meal['fats'])
+        ])
+    
+    writer.writerow([])
+    writer.writerow(['Total', '', round(plan['total_calories']), '', '', ''])
+    
+    # Create response
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv'
+    response.headers['Content-Disposition'] = f'attachment; filename=meal-plan-{today}.csv'
+    
+    return response
+
+
+@app.route('/api/v1/meal-plans/export/json', methods=['GET'])
+@jwt_required()
+def export_meal_plan_json():
+    user_id = get_jwt_identity()
+    today = datetime.date.today().isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM meal_plans WHERE user_id = ? AND date = ?', (user_id, today))
+    plan = cur.fetchone()
+    
+    if not plan:
+        conn.close()
+        return jsonify({'error': 'No meal plan found for today'}), 404
+    
+    cur.execute('SELECT name, calories, protein, carbs, fats, meal_type FROM meals WHERE meal_plan_id = ?', (plan['id'],))
+    meals = [{k: m[k] for k in m.keys()} for m in cur.fetchall()]
+    conn.close()
+    
+    export_data = {
+        'date': today,
+        'total_calories': round(plan['total_calories']),
+        'meals': meals,
+        'exported_at': datetime.datetime.now().isoformat()
+    }
+    
+    response = make_response(json.dumps(export_data, indent=2))
+    response.headers['Content-Type'] = 'application/json'
+    response.headers['Content-Disposition'] = f'attachment; filename=meal-plan-{today}.json'
+    
+    return response
 
 
 # ========== LEGACY ENDPOINT ==========
@@ -686,6 +1265,67 @@ def serve_vue(path):
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, 'index.html')
+
+
+# ========== BACKUP & MAINTENANCE ENDPOINTS ==========
+
+@app.route('/api/v1/admin/backup', methods=['POST'])
+@jwt_required()
+def create_backup():
+    """Create database backup (admin only)"""
+    user_id = get_jwt_identity()
+    
+    # Check if user is admin (user_id = 1 is admin)
+    if user_id != 1:
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    try:
+        backup_path = backup_database()
+        app.logger.info(f'Database backup created by user {user_id}: {backup_path}')
+        return jsonify({
+            'message': 'Backup created successfully',
+            'backup_path': backup_path
+        })
+    except Exception as e:
+        app.logger.error(f'Backup failed: {str(e)}')
+        return jsonify({'error': 'Backup failed', 'details': str(e)}), 500
+
+
+@app.route('/api/v1/admin/backups', methods=['GET'])
+@jwt_required()
+def get_backups():
+    """List all backups (admin only)"""
+    user_id = get_jwt_identity()
+    
+    if user_id != 1:
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    try:
+        backups = list_backups()
+        return jsonify({'backups': backups})
+    except Exception as e:
+        return jsonify({'error': 'Failed to list backups', 'details': str(e)}), 500
+
+
+@app.route('/api/v1/users/export-full', methods=['GET'])
+@jwt_required()
+def export_full_user_data():
+    """Export all user data as JSON"""
+    user_id = get_jwt_identity()
+    
+    try:
+        export_path = export_user_backup(user_id)
+        app.logger.info(f'User data exported: user={user_id}')
+        
+        # Read and return the export file
+        with open(export_path, 'r') as f:
+            import json
+            export_data = json.load(f)
+        
+        return jsonify(export_data)
+    except Exception as e:
+        app.logger.error(f'Export failed for user {user_id}: {str(e)}')
+        return jsonify({'error': 'Export failed', 'details': str(e)}), 500
 
 
 if __name__ == '__main__':

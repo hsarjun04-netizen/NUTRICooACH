@@ -5,7 +5,8 @@
       <div class="sidebar-brand">.Diet</div>
       <nav class="sidebar-nav">
         <router-link v-for="item in navItems" :key="item.to" :to="item.to" class="nav-item" :class="{ active: $route.path === item.to }" :title="item.label">
-          <span class="nav-icon">{{ item.icon }}</span>
+          <span class="nav-icon" v-html="item.icon"></span>
+          <span class="nav-label">{{ item.label }}</span>
         </router-link>
       </nav>
       <div class="sidebar-footer">
@@ -60,14 +61,14 @@
                   </div>
                   <div class="dropdown-divider"></div>
                   <router-link to="/profile" class="dropdown-item" @click="profileOpen = false">
-                    <span class="dropdown-icon">&#128100;</span> My Profile
+                    <span class="dropdown-icon" v-html="'&#128100;'"></span> My Profile
                   </router-link>
                   <router-link to="/setup" class="dropdown-item" @click="profileOpen = false">
-                    <span class="dropdown-icon">&#9881;</span> Settings
+                    <span class="dropdown-icon" v-html="'&#9881;'"></span> Settings
                   </router-link>
                   <div class="dropdown-divider"></div>
                   <a href="#" class="dropdown-item dropdown-danger" @click.prevent="doLogout">
-                    <span class="dropdown-icon">&#128682;</span> Logout
+                    <span class="dropdown-icon" v-html="'&#128682;'"></span> Logout
                   </a>
                 </div>
               </transition>
@@ -251,7 +252,8 @@ export default {
         { to: '/dashboard', icon: '&#127968;', label: 'Dashboard' },
         { to: '/meal-plan', icon: '&#128197;', label: 'Meal Plan' },
         { to: '/tracker', icon: '&#127860;', label: 'Food Tracker' },
-        { to: '/chat', icon: '&#128172;', label: 'AI Coach' },
+        { to: '/recipes', icon: '&#127859;', label: 'Recipes' },
+        { to: '/shopping-list', icon: '&#128221;', label: 'Shopping List' },
         { to: '/progress', icon: '&#128200;', label: 'Progress' },
         { to: '/profile', icon: '&#9881;', label: 'Profile' }
       ],
@@ -471,8 +473,8 @@ export default {
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-  width: 64px; background: var(--bg-sidebar);
-  display: flex; flex-direction: column; align-items: center;
+  width: 200px; background: var(--bg-sidebar);
+  display: flex; flex-direction: column; align-items: stretch;
   padding: 20px 0; flex-shrink: 0;
   border-radius: 0 20px 20px 0; margin: 12px 0 12px 0;
   transition: background var(--transition-slow);
@@ -481,12 +483,14 @@ export default {
 .sidebar-nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .sidebar-footer { margin-top: auto; padding-top: 16px; }
 .nav-item {
-  width: 44px; height: 44px;
-  display: flex; align-items: center; justify-content: center;
+  height: 44px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 16px;
   border-radius: 12px; color: var(--text-muted);
-  text-decoration: none; font-size: 1.2rem;
+  text-decoration: none; font-size: 0.9rem;
   transition: all var(--transition-base);
   position: relative;
+  margin: 0 8px;
 }
 .nav-item::before {
   content: ''; position: absolute; inset: 0; border-radius: 12px;
@@ -496,7 +500,8 @@ export default {
 .nav-item:hover, .nav-item.active { color: #1e293b; transform: scale(1.1); }
 .nav-item:hover::before, .nav-item.active::before { opacity: 1; transform: scale(1); }
 .nav-item:hover { box-shadow: 0 0 16px rgba(163, 230, 53, 0.4); }
-.nav-icon { position: relative; z-index: 1; }
+.nav-icon { position: relative; z-index: 1; font-size: 1.2rem; }
+.nav-label { position: relative; z-index: 1; font-weight: 500; }
 
 /* ===== MAIN ===== */
 .main-content { flex: 1; padding: 24px 32px; overflow-y: auto; }
@@ -740,7 +745,9 @@ export default {
   .dashboard-grid { grid-template-columns: 1fr; }
   .col-right { grid-column: auto; display: flex; flex-direction: column; }
   .bottom-row { grid-template-columns: 1fr; }
-  .sidebar { width: 52px; }
+  .sidebar { width: 60px; }
+  .nav-label { display: none; }
+  .nav-item { justify-content: center; padding: 0; margin: 0 4px; }
   .header-actions { gap: 6px; }
   .search-box { display: none; }
 }
