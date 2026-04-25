@@ -41,3 +41,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Temp files / screenshots
+test_*.py
+check_*.py
+render_*.png
+*_login_*.png
