@@ -47,3 +47,9 @@ test_*.py
 check_*.py
 render_*.png
 *_login_*.png
+*_mode.png
+*_dark.png
+*_light.png
+dashboard_*.png
+landing_*.png
+register_*.png
