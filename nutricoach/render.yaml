@@ -5,11 +5,11 @@ services:
     plan: free
     region: oregon
     buildCommand: |
-      pip install -r nutricoach/backend/requirements.txt
-      python nutricoach/backend/init_db.py
-      python nutricoach/backend/seed_recipes.py
-      cd nutricoach/frontend && npm install && npm run build
-    startCommand: cd nutricoach/backend && python wsgi.py
+      pip install -r backend/requirements.txt
+      python backend/init_db.py
+      python backend/seed_recipes.py
+      cd frontend && npm install && npm run build
+    startCommand: cd backend && python wsgi.py
     healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
