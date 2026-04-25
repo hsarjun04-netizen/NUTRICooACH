@@ -82,16 +82,22 @@
             <!-- Hero Banner -->
             <div class="hero-card" :style="delayStyle(1)">
               <div class="hero-content">
-                <div class="hero-badge"><span class="badge-icon">&#127947;</span> Challenge</div>
-                <h2>The 5 a day<br/>challenge <span class="fire">&#128293;</span></h2>
-                <p>Eat 5 servings of fruits & vegetables daily</p>
+                <div class="hero-badge"><span class="badge-icon">&#127947;</span> Weekly Challenge</div>
+                <h2>{{ currentChallenge.title }} <span class="fire">&#128293;</span></h2>
+                <p>{{ currentChallenge.description }}</p>
+                <div class="challenge-progress">
+                  <div class="challenge-bar">
+                    <span class="challenge-fill" :style="{ width: challengeProgress + '%' }"></span>
+                  </div>
+                  <span class="challenge-text">{{ challengeCurrent }} / {{ challengeGoal }} {{ currentChallenge.unit }}</span>
+                </div>
                 <div class="hero-avatars">
                   <span class="avatar" v-for="n in 3" :key="n">&#128100;</span>
                   <span class="avatar-more">+2k</span>
                 </div>
               </div>
               <div class="hero-image">
-                <div class="food-plate float">&#129367;</div>
+                <div class="food-plate float">{{ currentChallenge.icon }}</div>
                 <div class="dumbbell dumbbell-1 float-slow">&#127947;</div>
                 <div class="dumbbell dumbbell-2 float-slow2">&#127947;</div>
               </div>
@@ -239,6 +245,17 @@ export default {
       waterTotal: 0,
       waterGoal: 2500,
       todayMeals: [],
+      currentChallenge: {
+        id: 1,
+        title: '5 a Day Challenge',
+        description: 'Eat 5 servings of fruits & vegetables daily',
+        icon: '&#129367;',
+        goal: 35,
+        unit: 'servings',
+        weekStartDate: new Date().toISOString()
+      },
+      challengeCurrent: 0,
+      challengeProgress: 0,
       activityData: { labels: [], datasets: [] },
       donutData: { labels: [], datasets: [] },
       hasNotification: true,
@@ -254,6 +271,7 @@ export default {
         { to: '/tracker', icon: '&#127860;', label: 'Food Tracker' },
         { to: '/recipes', icon: '&#127859;', label: 'Recipes' },
         { to: '/shopping-list', icon: '&#128221;', label: 'Shopping List' },
+        { to: '/exercises', icon: '&#127947;', label: 'Exercise Tracker' },
         { to: '/progress', icon: '&#128200;', label: 'Progress' },
         { to: '/profile', icon: '&#9881;', label: 'Profile' }
       ],
@@ -313,6 +331,7 @@ export default {
     },
     waterCupsGoal() { return Math.round(this.waterGoal / 250) },
     waterCupsCurrent() { return Math.round(this.waterTotal / 250) },
+    challengeGoal() { return this.currentChallenge.goal || 35 },
     macroPercent() {
       const total = this.todayMeals.reduce((s, m) => s + (m.carbs || 0) + (m.protein || 0) + (m.fats || 0), 0) || 1
       const carbs = this.todayMeals.reduce((s, m) => s + (m.carbs || 0), 0)
@@ -336,6 +355,7 @@ export default {
     this.loadSummary()
     this.loadWater()
     this.loadMeals()
+    this.loadChallenge()
     this.buildCharts()
     document.addEventListener('click', this.handleClickOutside)
   },
@@ -365,6 +385,29 @@ export default {
         const res = await api.get('/meals/today')
         this.todayMeals = res.data.meals || []
       } catch (e) { console.error('Failed to load meals:', e) }
+    },
+    async loadChallenge() {
+      try {
+        const res = await api.get('/challenges/current')
+        if (res.data) {
+          this.currentChallenge = {
+            id: res.data.id,
+            title: res.data.title,
+            description: res.data.description,
+            icon: res.data.icon || '&#129367;',
+            goal: res.data.goal,
+            unit: res.data.unit,
+            weekStartDate: res.data.week_start_date
+          }
+          this.challengeCurrent = res.data.current_progress || 0
+          this.challengeProgress = res.data.progress_percent || 0
+        }
+      } catch (e) { 
+        console.error('Failed to load challenge:', e)
+        // Fallback to default challenge if API fails
+        this.challengeCurrent = 0
+        this.challengeProgress = 0
+      }
     },
     async addWater(amount) {
       try {
@@ -602,6 +645,10 @@ export default {
 .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: white; color: #16a34a; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; margin-bottom: 10px; animation: fadeIn 0.5s ease-out both; animation-delay: 0.3s; }
 .hero-content h2 { margin: 0 0 6px 0; font-size: 1.3rem; color: #166534; font-weight: 800; line-height: 1.3; }
 .hero-content p { margin: 0 0 12px 0; color: #15803d; font-size: 0.8rem; }
+.challenge-progress { margin-bottom: 12px; }
+.challenge-bar { height: 8px; background: rgba(255,255,255,0.5); border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+.challenge-fill { height: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b); border-radius: 4px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+.challenge-text { font-size: 0.75rem; color: #166534; font-weight: 600; }
 .fire { font-size: 1rem; display: inline-block; animation: flame 1.5s ease-in-out infinite; }
 @keyframes flame { 0%, 100% { transform: scale(1) rotate(-5deg); } 50% { transform: scale(1.2) rotate(5deg); } }
 .hero-avatars { display: flex; align-items: center; }

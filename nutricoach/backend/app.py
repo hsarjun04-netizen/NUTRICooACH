@@ -753,6 +753,117 @@ def get_water_today():
     return jsonify({'total_ml': total, 'entries': len(entries)})
 
 
+# ========== WEEKLY CHALLENGES ==========
+
+@app.route('/api/v1/challenges/current', methods=['GET'])
+@jwt_required()
+def get_current_challenge():
+    user_id = get_jwt_identity()
+    today = datetime.date.today()
+    week_start = (today - datetime.timedelta(days=today.weekday())).isoformat()
+    week_end = (today + datetime.timedelta(days=6-today.weekday())).isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Get current week challenge
+    cur.execute('''
+        SELECT * FROM weekly_challenges 
+        WHERE user_id = ? AND week_start_date = ?
+    ''', (user_id, week_start))
+    challenge = cur.fetchone()
+    
+    if not challenge:
+        # Create default challenge for the week
+        default_challenges = [
+            {
+                'title': '5 a Day Challenge',
+                'description': 'Eat 5 servings of fruits & vegetables daily',
+                'icon': '&#129367;',
+                'goal': 35,
+                'unit': 'servings'
+            },
+            {
+                'title': 'Hydration Hero',
+                'description': 'Drink 8 glasses of water every day',
+                'icon': '&#128167;',
+                'goal': 56,
+                'unit': 'glasses'
+            },
+            {
+                'title': 'Protein Power',
+                'description': 'Reach your daily protein goal 5 days this week',
+                'icon': '&#129385;',
+                'goal': 5,
+                'unit': 'days'
+            }
+        ]
+        
+        import random
+        challenge_data = random.choice(default_challenges)
+        
+        cur.execute('''
+            INSERT INTO weekly_challenges 
+            (user_id, title, description, icon, goal, unit, week_start_date, week_end_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, challenge_data['title'], challenge_data['description'], 
+              challenge_data['icon'], challenge_data['goal'], challenge_data['unit'],
+              week_start, week_end))
+        conn.commit()
+        
+        cur.execute('''
+            SELECT * FROM weekly_challenges 
+            WHERE user_id = ? AND week_start_date = ?
+        ''', (user_id, week_start))
+        challenge = cur.fetchone()
+    
+    conn.close()
+    
+    progress_percent = min((challenge['current_progress'] / challenge['goal']) * 100, 100)
+    
+    return jsonify({
+        'id': challenge['id'],
+        'title': challenge['title'],
+        'description': challenge['description'],
+        'icon': challenge['icon'],
+        'goal': challenge['goal'],
+        'unit': challenge['unit'],
+        'current_progress': challenge['current_progress'],
+        'progress_percent': round(progress_percent, 1),
+        'week_start_date': challenge['week_start_date'],
+        'week_end_date': challenge['week_end_date'],
+        'is_completed': bool(challenge['is_completed'])
+    })
+
+
+@app.route('/api/v1/challenges/update', methods=['POST'])
+@jwt_required()
+def update_challenge_progress():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    if not data or 'progress' not in data:
+        return jsonify({'error': 'Progress value is required'}), 400
+    
+    progress = data['progress']
+    today = datetime.date.today()
+    week_start = (today - datetime.timedelta(days=today.weekday())).isoformat()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('''
+        UPDATE weekly_challenges 
+        SET current_progress = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND week_start_date = ?
+    ''', (progress, user_id, week_start))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'progress': progress})
+
+
 # ========== RECIPES ==========
 
 @app.route('/api/v1/recipes', methods=['GET'])

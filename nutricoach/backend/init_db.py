@@ -215,6 +215,27 @@ CREATE TABLE IF NOT EXISTS custom_goals (
 );
 ''')
 
+# Weekly challenges table
+cur.execute('''
+CREATE TABLE IF NOT EXISTS weekly_challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT DEFAULT '&#129367;',
+    goal INTEGER NOT NULL,
+    unit TEXT NOT NULL,
+    current_progress INTEGER DEFAULT 0,
+    week_start_date DATE NOT NULL,
+    week_end_date DATE NOT NULL,
+    is_completed BOOLEAN DEFAULT 0,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+''')
+
 conn.commit()
 conn.close()
 

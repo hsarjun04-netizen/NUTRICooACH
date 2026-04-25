@@ -237,3 +237,25 @@ CREATE INDEX IF NOT EXISTS idx_meal_reminders_enabled ON meal_reminders(is_enabl
 
 -- Indexes for custom_goals
 CREATE INDEX IF NOT EXISTS idx_custom_goals_user_id ON custom_goals(user_id);
+
+CREATE TABLE IF NOT EXISTS weekly_challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    icon TEXT DEFAULT '&#129367;',
+    goal INTEGER NOT NULL,
+    unit TEXT NOT NULL,
+    current_progress INTEGER DEFAULT 0,
+    week_start_date DATE NOT NULL,
+    week_end_date DATE NOT NULL,
+    is_completed BOOLEAN DEFAULT 0,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_weekly_challenges_user_id ON weekly_challenges(user_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_challenges_week ON weekly_challenges(week_start_date, week_end_date);
+CREATE INDEX IF NOT EXISTS idx_weekly_challenges_completed ON weekly_challenges(is_completed);
