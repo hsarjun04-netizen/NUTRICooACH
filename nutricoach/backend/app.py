@@ -88,6 +88,17 @@ def setup_logging():
 
 setup_logging()
 
+# ========== HEALTH CHECK ==========
+@app.route('/api/v1/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for deployment monitoring"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'NutriCoach AI',
+        'version': '2.0',
+        'timestamp': datetime.datetime.now().isoformat()
+    }), 200
+
 # ========== ERROR HANDLING MIDDLEWARE ==========
 @app.errorhandler(400)
 def bad_request(error):

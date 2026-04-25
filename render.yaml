@@ -3,10 +3,17 @@ services:
     name: nutricoach-ai
     runtime: python
     plan: free
+    region: oregon
     buildCommand: |
-      cd nutricoach/backend && pip install -r requirements.txt
-      cd ../frontend && npm install && npm run build
+      cd nutricoach/backend
+      pip install -r requirements.txt
+      python init_db.py
+      python seed_recipes.py
+      cd ../frontend
+      npm install
+      npm run build
     startCommand: cd nutricoach/backend && python wsgi.py
+    healthCheckPath: /api/v1/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -16,3 +23,5 @@ services:
         value: production
       - key: JWT_SECRET_KEY
         generateValue: true
+      - key: PORT
+        value: 5000
