@@ -5,10 +5,14 @@ services:
     plan: free
     region: oregon
     buildCommand: |
+      # Install Python dependencies
       pip install -r backend/requirements.txt
+      # Initialize database
       python backend/init_db.py
       python backend/seed_recipes.py
-      cd frontend && npm install && npm run build
+      # Build frontend (monorepo structure)
+      npm install
+      npm run build
     startCommand: cd backend && python wsgi.py
     healthCheckPath: /api/v1/health
     envVars:

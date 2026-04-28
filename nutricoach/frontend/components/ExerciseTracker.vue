@@ -203,7 +203,6 @@ const navItems = [
   { to: '/meal-plan', label: 'Meal Plan', icon: '&#128197;' },
   { to: '/tracker', label: 'Food Tracker', icon: '&#127859;' },
   { to: '/recipes', label: 'Recipes', icon: '&#128214;' },
-  { to: '/shopping-list', label: 'Shopping List', icon: '&#128722;' },
   { to: '/exercises', label: 'Exercise Tracker', icon: '&#127939;' },
   { to: '/progress', label: 'Progress', icon: '&#128200;' },
   { to: '/profile', label: 'Profile', icon: '&#9881;' }

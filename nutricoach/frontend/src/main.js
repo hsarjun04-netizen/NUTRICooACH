@@ -6,9 +6,10 @@ import { useThemeStore } from './stores/theme.js'
 import './styles/modern-ui.css'
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 
-const themeStore = useThemeStore()
+const themeStore = useThemeStore(pinia)
 themeStore.init()
 
 app.use(router)

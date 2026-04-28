@@ -1,8 +1,75 @@
-# NutriCoach AI
+# NutriCoach - AI-Powered Nutrition Coaching
 
-A personalized diet plan generator web application built with Vue.js frontend and Python backend.
+A full-stack monorepo project with Vue.js frontend and Python Flask backend.
+
+## Project Structure
+
+```
+nutricoach/
+├── frontend/              # Vue 3 + Vite web application
+│   ├── src/              # Vue components, pages, stores
+│   ├── package.json      # Frontend dependencies
+│   ├── vite.config.js    # Vite configuration
+│   └── dist/             # Built frontend (generated)
+├── backend/              # Python Flask API
+│   ├── app.py           # Main Flask app
+│   ├── requirements.txt  # Python dependencies
+│   ├── wsgi.py          # WSGI entry point
+│   └── database.db      # SQLite database
+├── package.json         # Root monorepo configuration
+├── render.yaml          # Deployment configuration
+└── README.md           # This file
+```
+
+## Getting Started
+
+### Prerequisites
+- Node.js 20.11.0+
+- Python 3.11.0+
+- npm
+
+### Installation
+
+```bash
+# Install all dependencies (frontend + root tools)
+npm install
+```
+
+### Development
+
+**Frontend only:**
+```bash
+npm run dev
+```
+
+**Backend only:**
+```bash
+cd backend
+python wsgi.py
+```
+
+**Both together:**
+- Terminal 1: `npm run dev` (frontend starts on http://localhost:5173)
+- Terminal 2: `cd backend && python wsgi.py` (backend starts on http://localhost:5000)
+
+### Building
+
+**Frontend:**
+```bash
+npm run build
+```
+
+**Preview built frontend:**
+```bash
+npm run preview
+```
 
 ## Features
+
+- **Frontend**: Vue 3 with Vite, Vue Router, Pinia state management, Chart.js visualizations
+- **Backend**: Python Flask API with JWT authentication, SQLite database
+- **Database**: Meal recipes, user nutritional tracking, personalized recommendations
+- **Deployment**: Render.com with Python + Node.js runtime
 - User registration and authentication
 - Dietary preferences and restriction tracking
 - Personalized meal plan generation
@@ -10,68 +77,53 @@ A personalized diet plan generator web application built with Vue.js frontend an
 - Mobile-responsive design
 
 ## Tech Stack
-- Frontend: Vue.js
-- Backend: Python (Flask)
-- Database: SQLite (via SQLAlchemy)
-- Deployment: Docker
 
-## Getting Started
+- Frontend: Vue 3, Vite
+- Backend: Python, Flask
+- Database: SQLite
+- Deployment: Render.com
 
-### Prerequisites
-- Node.js (v18+)
-- Python (3.11+)
-- Docker (optional for deployment)
+## Available Scripts
 
-### Running the Application
+### Root Level
+- `npm run dev` - Start frontend dev server
+- `npm run build` - Build frontend for production
+- `npm run preview` - Preview production build
+- `npm run install-all` - Install all dependencies
+- `npm run clean` - Clean all generated files
 
-#### Frontend
+### Backend
 ```bash
-cd nutricoach/frontend
-npm install
-npm run dev
+cd backend
+python init_db.py      # Initialize database
+python seed_recipes.py # Seed recipe data
+python wsgi.py         # Start Flask server
 ```
 
-#### Backend
-```bash
-cd nutricoach/backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-python app.py
+## API Documentation
+
+See `backend/API.md` for complete API documentation.
+
+## Deployment
+
+The project is configured for deployment on Render.com via `render.yaml`:
+
+```yaml
+buildCommand: |
+  pip install -r backend/requirements.txt
+  python backend/init_db.py
+  python backend/seed_recipes.py
+  npm install
+  npm run build
 ```
 
-### Database Setup
-```bash
-cd nutricoach/backend
-python init_db.py
-```
+## Development Notes
 
-## API Endpoints
-See [API Documentation](backend/API.md) for detailed endpoint descriptions.
+- Frontend is served from `frontend/dist/` after build
+- Backend serves both API and static frontend assets
+- Environment variables are managed in `render.yaml`
+- Database uses SQLite for simplicity (can be upgraded to PostgreSQL for production)
 
 ## License
+
 MIT
-
-## Usage
-
-1. **Backend**:
-   ```bash
-   cd nutricoach/backend
-   python -m venv venv
-   # On Windows
-   venv\Scripts\activate
-   # On Unix
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python app.py
-   ```
-2. **Frontend**:
-   ```bash
-   cd nutricoach/frontend
-   npm install
-   npm run dev
-   ```
-   The development server will be available at `http://localhost:5173/`.
-3. Open the landing page in your browser at `http://localhost:5173/`. Fill in the form and submit to create a user via the backend API.
-
-For production deployment, refer to the Docker setup instructions.

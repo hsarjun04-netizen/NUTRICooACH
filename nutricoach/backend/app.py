@@ -4,8 +4,9 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional
 import sqlite3
 import os
 import sys
@@ -19,9 +20,7 @@ from logging.handlers import RotatingFileHandler
 sys.path.insert(0, os.path.dirname(__file__))
 from meal_engine import generate_meal_plan
 from validation import (
-    sanitize_string, sanitize_email, validate_password,
-    validate_number, validate_date, validate_exercise_data,
-    validate_meal_data, validate_user_profile, paginate_query
+    sanitize_string, validate_exercise_data, validate_user_profile
 )
 from backup import backup_database, list_backups, export_user_data as export_user_backup
 
@@ -164,8 +163,6 @@ def handle_exception(e):
         'message': 'An unexpected error occurred'
     }), 500
 
-from werkzeug.exceptions import HTTPException
-
 # ========== REQUEST LOGGING MIDDLEWARE ==========
 @app.before_request
 def log_request():
@@ -225,12 +222,6 @@ def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
-
-def sanitize_input(text: str, max_length: int = 500) -> str:
-    """Sanitize user input to prevent injection"""
-    if not text:
-        return ""
-    return text.strip()[:max_length]
 
 # ========== AUTH ==========
 
@@ -305,9 +296,23 @@ def update_profile():
     user_id = get_jwt_identity()
     data = request.json
 
+    errors = validate_user_profile(data)
+    if errors:
+        return jsonify({'error': 'Validation failed', 'details': errors}), 400
+
     fields = ['name', 'age', 'gender', 'height', 'weight', 'goals',
               'activity_level', 'diet_type', 'allergies', 'medical_conditions', 'budget']
-    updates = {k: sanitize_input(str(data.get(k)), 1000) for k in fields if k in data}
+    
+    updates = {}
+    for k in fields:
+        if k in data:
+            val = data[k]
+            if val is None:
+                updates[k] = None
+            elif k in ['age', 'height', 'weight', 'budget']:
+                updates[k] = val
+            else:
+                updates[k] = sanitize_string(str(val), 1000)
 
     if not updates:
         return jsonify({'error': 'No fields to update'}), 400
@@ -969,109 +974,6 @@ def toggle_recipe_favorite(recipe_id):
     return jsonify({'is_favorite': new_favorite})
 
 
-# ========== SHOPPING LIST ==========
-
-@app.route('/api/v1/shopping-list/generate', methods=['POST'])
-@jwt_required()
-def generate_shopping_list():
-    user_id = get_jwt_identity()
-    today = datetime.date.today().isoformat()
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    cur.execute('SELECT id FROM meal_plans WHERE user_id = ? AND date = ?', (user_id, today))
-    plan = cur.fetchone()
-    
-    if not plan:
-        conn.close()
-        return jsonify({'error': 'No meal plan found for today'}), 404
-    
-    meal_plan_id = plan['id']
-    
-    cur.execute('DELETE FROM shopping_lists WHERE user_id = ? AND meal_plan_id = ?', (user_id, meal_plan_id))
-    
-    cur.execute('SELECT name FROM meals WHERE meal_plan_id = ?', (meal_plan_id,))
-    meals = cur.fetchall()
-    
-    ingredient_map = {
-        'chicken': {'category': 'Protein', 'unit': 'kg'},
-        'fish': {'category': 'Protein', 'unit': 'kg'},
-        'paneer': {'category': 'Dairy', 'unit': 'g'},
-        'dal': {'category': 'Grains', 'unit': 'kg'},
-        'rice': {'category': 'Grains', 'unit': 'kg'},
-        'roti': {'category': 'Grains', 'unit': 'pcs'},
-        'egg': {'category': 'Dairy', 'unit': 'pcs'},
-        'vegetable': {'category': 'Vegetables', 'unit': 'kg'},
-        'sabzi': {'category': 'Vegetables', 'unit': 'kg'},
-        'fruit': {'category': 'Fruits', 'unit': 'kg'},
-        'milk': {'category': 'Dairy', 'unit': 'L'},
-        'curd': {'category': 'Dairy', 'unit': 'g'},
-    }
-    
-    for meal in meals:
-        meal_name = meal['name'].lower()
-        for keyword, info in ingredient_map.items():
-            if keyword in meal_name:
-                cur.execute(
-                    'INSERT INTO shopping_lists (user_id, item_name, category, quantity, unit, meal_plan_id) VALUES (?, ?, ?, ?, ?, ?)',
-                    (user_id, keyword.capitalize(), info['category'], '1', info['unit'], meal_plan_id)
-                )
-                break
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'message': 'Shopping list generated successfully'})
-
-
-@app.route('/api/v1/shopping-list', methods=['GET'])
-@jwt_required()
-def get_shopping_list():
-    user_id = get_jwt_identity()
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT * FROM shopping_lists WHERE user_id = ? ORDER BY category, item_name', (user_id,))
-    items = [{k: row[k] for k in row.keys()} for row in cur.fetchall()]
-    conn.close()
-    
-    return jsonify({'items': items})
-
-
-@app.route('/api/v1/shopping-list/item/<int:item_id>', methods=['PUT'])
-@jwt_required()
-def toggle_shopping_item(item_id):
-    user_id = get_jwt_identity()
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('SELECT is_purchased FROM shopping_lists WHERE id = ? AND user_id = ?', (item_id, user_id))
-    item = cur.fetchone()
-    
-    if not item:
-        conn.close()
-        return jsonify({'error': 'Item not found'}), 404
-    
-    new_status = not item['is_purchased']
-    cur.execute('UPDATE shopping_lists SET is_purchased = ? WHERE id = ?', (new_status, item_id))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'is_purchased': new_status})
-
-
-@app.route('/api/v1/shopping-list', methods=['DELETE'])
-@jwt_required()
-def clear_shopping_list():
-    user_id = get_jwt_identity()
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute('DELETE FROM shopping_lists WHERE user_id = ?', (user_id,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'message': 'Shopping list cleared'})
-
-
 # ========== BODY MEASUREMENTS ==========
 
 @app.route('/api/v1/measurements/log', methods=['POST'])
@@ -1398,7 +1300,7 @@ def create_backup():
     user_id = get_jwt_identity()
     
     # Check if user is admin (user_id = 1 is admin)
-    if user_id != 1:
+    if str(user_id) != '1':
         return jsonify({'error': 'Admin access required'}), 403
     
     try:
@@ -1419,7 +1321,7 @@ def get_backups():
     """List all backups (admin only)"""
     user_id = get_jwt_identity()
     
-    if user_id != 1:
+    if str(user_id) != '1':
         return jsonify({'error': 'Admin access required'}), 403
     
     try:

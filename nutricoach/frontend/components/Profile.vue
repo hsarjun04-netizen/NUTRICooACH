@@ -220,7 +220,6 @@ export default {
         { to: '/meal-plan', icon: '&#128197;', label: 'Meal Plan' },
         { to: '/tracker', icon: '&#127860;', label: 'Food Tracker' },
         { to: '/recipes', icon: '&#127859;', label: 'Recipes' },
-        { to: '/shopping-list', icon: '&#128221;', label: 'Shopping List' },
         { to: '/exercises', icon: '&#127939;', label: 'Exercise Tracker' },
         { to: '/progress', icon: '&#128200;', label: 'Progress' },
         { to: '/profile', icon: '&#9881;', label: 'Profile' }
