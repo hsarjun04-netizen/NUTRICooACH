@@ -223,15 +223,6 @@ export const getRecipeSuggestions = () => api.get('/recipes/suggestions')
 
 export const toggleRecipeFavorite = (id) => api.post(`/recipes/${id}/favorite`)
 
-// Shopping List
-export const generateShoppingList = () => api.post('/shopping-list/generate')
-
-export const getShoppingList = () => api.get('/shopping-list')
-
-export const toggleShoppingItem = (id) => api.put(`/shopping-list/item/${id}`)
-
-export const clearShoppingList = () => api.delete('/shopping-list')
-
 // Body Measurements
 export const logMeasurement = (data) => api.post('/measurements/log', data)
 

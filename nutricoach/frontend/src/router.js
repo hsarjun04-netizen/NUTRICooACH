@@ -10,7 +10,6 @@ const routes = [
   { path: '/meal-plan', component: () => import('../components/MealPlan.vue'), meta: { requiresAuth: true } },
   { path: '/tracker', component: () => import('../components/FoodTracker.vue'), meta: { requiresAuth: true } },
   { path: '/recipes', component: () => import('../components/Recipes.vue'), meta: { requiresAuth: true } },
-  { path: '/shopping-list', component: () => import('../components/ShoppingList.vue'), meta: { requiresAuth: true } },
   { path: '/exercises', component: () => import('../components/ExerciseTracker.vue'), meta: { requiresAuth: true } },
   { path: '/progress', component: () => import('../components/Progress.vue'), meta: { requiresAuth: true } }
 ]
