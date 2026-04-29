@@ -239,4 +239,8 @@ CREATE TABLE IF NOT EXISTS weekly_challenges (
 conn.commit()
 conn.close()
 
+# Seed recipes
+from seed_recipes import seed_recipes
+seed_recipes()
+
 print("Database initialized successfully")
