@@ -906,8 +906,11 @@ def get_recipes():
         query += ' AND meal_type = ?'
         params.append(meal_type)
     if max_calories:
-        query += ' AND calories <= ?'
-        params.append(float(max_calories))
+        try:
+            query += ' AND calories <= ?'
+            params.append(float(max_calories))
+        except ValueError:
+            return jsonify({'error': 'max_calories must be a numeric value'}), 400
     
     query += ' ORDER BY name ASC'
     cur.execute(query, params)

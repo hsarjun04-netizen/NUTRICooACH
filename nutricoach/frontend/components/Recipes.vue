@@ -187,7 +187,7 @@ const loadRecipes = async () => {
   loading.value = true
   try {
     const response = await getRecipes(filters.value)
-    recipes.value = response.data.recipes
+    recipes.value = response.data.recipes || []
   } catch (error) {
     console.error('Failed to load recipes:', error)
   } finally {
@@ -199,7 +199,7 @@ const loadSuggestions = async () => {
   loading.value = true
   try {
     const response = await getRecipeSuggestions()
-    recipes.value = response.data.recipes
+    recipes.value = response.data.recipes || []
   } catch (error) {
     console.error('Failed to load suggestions:', error)
   } finally {
@@ -221,6 +221,7 @@ const viewRecipe = (recipe) => {
 }
 
 const getRecipeEmoji = (name) => {
+  if (!name) return '🍲'
   const lower = name.toLowerCase()
   if (lower.includes('chicken') || lower.includes('egg')) return '&#129370;'
   if (lower.includes('fish') || lower.includes('salmon')) return '&#128031;'
