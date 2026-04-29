@@ -237,8 +237,12 @@ def sanitize_input(text: str, max_length: int = 500) -> str:
 @app.route('/api/v1/auth/register', methods=['POST'])
 @limiter.limit("10 per minute")
 def register():
+    body = request.get_json(silent=True)
+    if body is None:
+        return jsonify({'error': 'JSON body required'}), 400
+        
     try:
-        data = RegisterModel(**request.json)
+        data = RegisterModel(**body)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
     
@@ -263,8 +267,12 @@ def register():
 @app.route('/api/v1/auth/login', methods=['POST'])
 @limiter.limit("20 per minute")
 def login():
+    body = request.get_json(silent=True)
+    if body is None:
+        return jsonify({'error': 'JSON body required and must be application/json'}), 400
+    
     try:
-        data = LoginModel(**request.json)
+        data = LoginModel(**body)
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -307,7 +315,7 @@ def update_profile():
 
     fields = ['name', 'age', 'gender', 'height', 'weight', 'goals',
               'activity_level', 'diet_type', 'allergies', 'medical_conditions', 'budget']
-    updates = {k: sanitize_input(str(data.get(k)), 1000) for k in fields if k in data}
+    updates = {k: sanitize_string(str(data.get(k)), 1000) for k in fields if k in data}
 
     if not updates:
         return jsonify({'error': 'No fields to update'}), 400
