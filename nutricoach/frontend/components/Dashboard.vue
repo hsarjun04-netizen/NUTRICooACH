@@ -80,7 +80,7 @@
           <!-- Left Column -->
           <div class="col-left">
             <!-- Hero Banner -->
-            <div class="hero-card" :style="delayStyle(1)">
+            <div class="hero-card" :style="delayStyle(1)" @click="$router.push('/progress')" role="button" tabindex="0">
               <div class="hero-content">
                 <div class="hero-badge"><span class="badge-icon">&#127947;</span> Weekly Challenge</div>
                 <h2>{{ currentChallenge.title }} <span class="fire">&#128293;</span></h2>
@@ -124,7 +124,7 @@
               <div class="meals-card" :style="delayStyle(3)">
                 <h3>Daily Calories</h3>
                 <transition-group name="meal-slide" tag="div" class="meal-list">
-                  <div v-for="(meal, i) in todayMeals.slice(0, 3)" :key="meal.id" class="meal-row" :style="delayStyle(3.5 + i * 0.1)">
+                  <div v-for="(meal, i) in todayMeals.slice(0, 3)" :key="meal.id" class="meal-row" :style="delayStyle(3.5 + i * 0.1)" @click="$router.push('/tracker')" role="button" tabindex="0">
                     <div class="meal-dot" :class="meal.meal_type"></div>
                     <div class="meal-info">
                       <div class="meal-name">{{ capitalize(meal.meal_type) }}</div>
@@ -152,7 +152,7 @@
           <!-- Middle Column -->
           <div class="col-mid">
             <!-- Daily Activity -->
-            <div class="activity-card" :style="delayStyle(4)">
+            <div class="activity-card" :style="delayStyle(4)" @click="$router.push('/progress')" role="button" tabindex="0">
               <div class="activity-header">
                 <h3>Daily activity</h3>
                 <span class="activity-val">{{ animatedCalories }}Kcal</span>
@@ -167,7 +167,7 @@
             </div>
 
             <!-- Calendar -->
-            <div class="calendar-card" :style="delayStyle(5)">
+            <div class="calendar-card" :style="delayStyle(5)" @click="$router.push('/progress')" role="button" tabindex="0">
               <div class="cal-header">
                 <span class="cal-month">{{ currentMonth }}</span>
                 <div class="cal-nav">
@@ -187,7 +187,7 @@
           <!-- Right Column -->
           <div class="col-right">
             <!-- Calories Budget Donut -->
-            <div class="budget-card" :style="delayStyle(6)">
+            <div class="budget-card" :style="delayStyle(6)" @click="$router.push('/tracker')" role="button" tabindex="0">
               <h3>Calories Budget</h3>
               <div class="donut-wrap">
                 <Doughnut :data="donutData" :options="donutOptions" />
@@ -270,7 +270,6 @@ export default {
         { to: '/meal-plan', icon: '&#128197;', label: 'Meal Plan' },
         { to: '/tracker', icon: '&#127860;', label: 'Food Tracker' },
         { to: '/recipes', icon: '&#127859;', label: 'Recipes' },
-        { to: '/shopping-list', icon: '&#128221;', label: 'Shopping List' },
         { to: '/exercises', icon: '&#127947;', label: 'Exercise Tracker' },
         { to: '/progress', icon: '&#128200;', label: 'Progress' },
         { to: '/profile', icon: '&#9881;', label: 'Profile' }
@@ -640,6 +639,7 @@ export default {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 20px; position: relative; overflow: hidden;
   transition: all var(--transition-slow);
+  cursor: pointer;
 }
 .hero-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(22, 163, 74, 0.15); }
 .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: white; color: #16a34a; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; margin-bottom: 10px; animation: fadeIn 0.5s ease-out both; animation-delay: 0.3s; }
@@ -674,6 +674,7 @@ export default {
 .recap-card, .meals-card, .calendar-card, .budget-card {
   background: var(--bg-card); border-radius: var(--radius-lg); padding: 20px;
   transition: all var(--transition-slow);
+  cursor: pointer;
 }
 .recap-card:hover, .meals-card:hover, .calendar-card:hover, .budget-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
 .recap-card h3, .meals-card h3, .calendar-card h3, .budget-card h3 { margin: 0 0 16px 0; font-size: 0.95rem; color: var(--text-primary); transition: color var(--transition-slow); }
@@ -722,7 +723,7 @@ export default {
 .meal-slide-enter-from, .meal-slide-leave-to { opacity: 0; transform: translateX(20px); }
 
 /* Activity */
-.activity-card { background: #1e293b; border-radius: var(--radius-lg); padding: 20px; color: white; margin-bottom: 20px; transition: all var(--transition-slow); }
+.activity-card { background: #1e293b; border-radius: var(--radius-lg); padding: 20px; color: white; margin-bottom: 20px; transition: all var(--transition-slow); cursor: pointer; }
 .activity-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(30, 41, 59, 0.25); }
 .activity-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .activity-header h3 { margin: 0; font-size: 0.9rem; font-weight: 600; }
